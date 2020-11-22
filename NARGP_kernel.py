@@ -13,7 +13,7 @@ class NARPGKernel(Kern):
         super(NARPGKernel, self).__init__(input_dim, active_dims, 'NARGP')
 
         kern1 = kernClass1(input_dim,   active_dims=active_dims, ARD=True)
-        kern2 = kernClass2(input_dim=1, active_dims=[input_dim], ARD=True)
+        kern2 = kernClass2(input_dim=1, active_dims=[input_dim-1], ARD=True)
         kern3 = kernClass3(input_dim,   active_dims=active_dims, ARD=True)
 
         self.kernel = kern1 * kern2 + kern3
