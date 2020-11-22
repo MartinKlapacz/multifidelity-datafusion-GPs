@@ -6,6 +6,7 @@ from sklearn.datasets import load_boston
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import mean_squared_error
 from abc import ABC, abstractmethod
+import pickle
 
 
 def generate_random_training_data(a, b):
@@ -14,10 +15,17 @@ def generate_random_training_data(a, b):
     return X, Y
 
 
-class AbastractGP(ABC):
+def generate_Mauna_Loa_data(reduce_by: int = 1):
+    with open("./datasets/mauna_loa", 'rb') as fid:
+        data = pickle.load(fid)
+    X_train = data.get('X')[::reduce_by]
+    y_train = data.get('Y')[::reduce_by]
+    X_test = data.get('Xtest')[::reduce_by]
+    y_test = data.get('Ytest')[::reduce_by]
+    return X_train, y_train, X_test, y_test
 
-    def __init__(self):
-        super().__init__()
+class AbstractGP(abc):
+    pass
 
 
 class GPDataAugmentation:
@@ -42,7 +50,7 @@ class GPDataAugmentation:
         self.hf_model = GPy.models.GPRegression(
             augmented_X, Y, initialize=True
         )
-        self.hf_model.optimize() # ARD
+        self.hf_model.optimize()  # ARD
 
     def predict(self, x: float):
         x = np.append(x, self.lff(x))
@@ -75,30 +83,21 @@ class GPDataAugmentation:
 
 
 if __name__ == "__main__":
-
-    # generate training data
     # TODO use training data from gaussian process summer school 2020
-    def f(x): return 2 * np.sin(x) + 0.01 * x * x
-    a = 0
-    b = 30
-    n = 25
-    X = np.linspace(a, b, n).reshape(-1, 1)
-    Y = np.array([f(x) for x in X])
-
-    X_train, X_test, y_train, y_test = train_test_split(
-        X, Y, test_size=0.2, random_state=42
-    )
+    X_train, y_train, X_test, y_test = generate_Mauna_Loa_data(reduce_by=2)
 
     # init low fidelity model
     lf_model = GPy.models.GPRegression(X=X_train, Y=y_train)
     lf_model.optimize()
+    lf_model.plot()
+    plt.figure(figsize=(14, 8))
+    plt.xlabel("year")
+    plt.ylabel("CO$_2$ (PPM)")
+    plt.title("Monthly mean CO$_2$ at the Mauna Loa Observatory, Hawaii")
+    plt.show()
 
     def lff(x): return lf_model.predict(np.array([x]))[0]
 
-    # init high fidelity model
-    modified_GP = GPDataAugmentation(lff, tau=0.1, n=0, dimension=1)
-    modified_GP.fit(X_train, y_train)
-    print(modified_GP.predict(X_test[0]))
 
 # TODO abstract class, multiple implementations of GP Methods inheriting of abstract class
 # TODO child classes:

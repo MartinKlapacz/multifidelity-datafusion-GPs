@@ -39,7 +39,7 @@ class NARPGKernel(Kern):
         return self.kernel.K(X, X2)
 
     def Kdiag(self, X, ):
-        self.kernel.Kdiag(X)
+        return self.kernel.Kdiag(X)
 
     def plot(self, ):
         self.kernel.plot()
@@ -48,6 +48,6 @@ class NARPGKernel(Kern):
 X = np.array([[normal(), normal()] for i in range(5)])
 
 kernel = NARPGKernel(2, RBF, RBF, RBF)
-print(kernel.K(X))
+print(kernel.Kdiag(X))
 
 rbf = RBF(2)
