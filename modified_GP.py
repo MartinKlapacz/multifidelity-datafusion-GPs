@@ -7,6 +7,7 @@ from sklearn.model_selection import train_test_split
 from sklearn.metrics import mean_squared_error
 from abc import ABC, abstractmethod
 import pickle
+from NARGP_kernel import NARPGKernel
 
 
 def generate_random_training_data(a, b):
@@ -24,62 +25,74 @@ def generate_Mauna_Loa_data(reduce_by: int = 1):
     y_test = data.get('Ytest')[::reduce_by]
     return X_train, y_train, X_test, y_test
 
-class AbstractGP(abc):
-    pass
-
 
 class GPDataAugmentation:
 
-    def __init__(self, lff: callable, tau: float, n: int, dimension: int):
+    def __init__(self, lff: callable, tau: float, n: int, input_dims: int):
         '''
         input: lff
             low fidelity function
         input: tau
             distance to neighbour points used in taylor expansion
-        input: derivate_bitmap
-            describes included derivatives, if i-th entry is true, i-th derivative is included
         input n: 
             number of lags in the augmentation process (2*n + 1)
         '''
         self.lff = lff
         self.tau = tau
         self.n = n
+        self.input_dims = input_dims
+        self.hf_model = None
 
     def fit(self, X, Y):
-        augmented_X = self.__augment(X)
+        assert X.ndim == 2
+        assert Y.ndim == 2
+        assert X.shape[1] == self.input_dims, 'invalid input dimension'
+        assert len(X) == len(Y), 'not match lengths'
+
+        augmented_X = self.__augment_vector_list(X)
+        # kernel = NARPGKernel(self.input_dims)
         self.hf_model = GPy.models.GPRegression(
             augmented_X, Y, initialize=True
         )
         self.hf_model.optimize()  # ARD
 
     def predict(self, x: float):
-        x = np.append(x, self.lff(x))
-        return self.hf_model.predict(np.array([x]))
+        assert x.ndim == 1, 'prediction input must be vector'
+        assert len(x) == self.input_dims, 'invalid input dimension'
 
-    def __augment_vector(self, x: np.ndarray, ):
-        # always augment x with its low-fidelity value
-        x = np.append(x, self.lff(x))
-        # for n > 0 include lagged values
-        for i in range(self.n):
-            lff_values = [
-                self.lff(x + i * self.tau),
-                self.lff(x - i * self.tau)
-            ]
-            x = np.concatenate(x, lff_values)
+        augmented_x = self.__augment_vector(x)
+        return self.hf_model.predict(np.array([augmented_x]))
+
+    def plot(self, a, b):
+        assert a < b, "b must be greater than a"
+        assert self.hf_model is not None, 'model is not fitted yet'
+
+        X = np.linspace(a, b, (b - a) * 10)
+        Y = [self.predict(x) for x in X]
+        plt.plot(X, Y, 'ro')
+        plot.show()
+
+    def __augment_vector(self, x: np.ndarray):
+        assert x.ndim == 1, 'vector to augment must have vector shape'
+
+        # augment x with its low-fidelity prediction value
+        scalar = x[0]
+        x = np.append(x, self.lff(scalar))
+        # if n > 0 include lagged values
+        for i in range(1, self.n+1):
+            x = np.append(x, self.lff(scalar + i * self.tau))
+            x = np.append(x, self.lff(scalar - i * self.tau))
         return x
 
-    def __augment(self, X: [float], ):
-        """ append the low fidelity prediction to each data vector in X """
-        augmented_X = [self.__augment_vector(x) for x in X]
-        return np.array(augmented_X)
+    def __augment_vector_list(self, X):
+        assert isinstance(X, np.ndarray), 'input must be an array'
+        assert len(X) > 0, 'input must be non-empty'
 
-    def __numeric_derivative(self, f: callable, x: np.array, n: int):
-        """ implementing the formula for the nth-derivate stencil """
-        # currently not needed
-        sum = 0
-        for k in range(n):
-            sum = + (-1)**(k + n) * binom(n, k) * f(x+k*self.tau)[0]
-        return sum / self.tau**n
+        augmented_X = np.array([self.__augment_vector(x) for x in X])
+        print(augmented_X.shape)
+        print(self.input_dims + 2 * self.n + 1)
+        assert augmented_X.shape[1] == self.input_dims + 2 * self.n + 1
+        return augmented_X
 
 
 if __name__ == "__main__":
@@ -89,15 +102,17 @@ if __name__ == "__main__":
     # init low fidelity model
     lf_model = GPy.models.GPRegression(X=X_train, Y=y_train)
     lf_model.optimize()
-    lf_model.plot()
-    plt.figure(figsize=(14, 8))
-    plt.xlabel("year")
-    plt.ylabel("CO$_2$ (PPM)")
-    plt.title("Monthly mean CO$_2$ at the Mauna Loa Observatory, Hawaii")
-    plt.show()
 
-    def lff(x): return lf_model.predict(np.array([x]))[0]
+    def lff(x): 
+        model_input = np.array([[x]])
+        model_output = lf_model.predict(model_input)
+        y = model_output[0][0][0]
 
+        assert type(y) == np.float64
+        return y
+    
+    hf_model = GPDataAugmentation(lff, tau=.5, n=2, input_dims=1)
+    hf_model.fit(X=X_train, Y=y_train)
 
 # TODO abstract class, multiple implementations of GP Methods inheriting of abstract class
 # TODO child classes:
