@@ -44,19 +44,12 @@ class GPDataAugmentation:
         self.input_dims = input_dims
 
         self.lf_model = None
-        self.lf_X = None
-        self.lf_Y = None
         self.__lf_mean_predict = None
 
         self.hf_model = None
-        self.hf_X = None
-        self.hf_Y = None
-        self.hf_mean_predict = None
 
     def lf_fit(self, lf_X, lf_Y):
         assert lf_X.ndim == 2
-        self.lf_X = lf_X
-        self.lf_Y = lf_Y
         self.lf_model = GPy.models.GPRegression(
             X=lf_X, Y=lf_Y, initialize=True
         )
@@ -70,13 +63,16 @@ class GPDataAugmentation:
         self.hf_model = GPy.models.GPRegression(
             X=augmented_hf_X, Y=hf_Y, initialize=True
         )
-        self.hf_model.optimize()  # ARD
-        self.hf_mean_predict = lambda t: self.hf_model.predict(np.array([t]))[0]
+        self.hf_model.optimize() # ARD
 
-    def predict(self, x):
-        assert x.ndim == 1, 'prediction input must be vector'
-        assert len(x) == self.input_dims, 'invalid input dimension'
-        return self.hf_mean_predict(x)
+    def predict(self, X_test):
+        assert X_test.ndim == 2
+        assert X_test.shape[1] == self.input_dims
+        X_test = self.__augment_vector_list(X_test)
+        return self.hf_model.predict(X_test)
+
+    def predict_means(self, X_test):
+        return self.predict(X_test)[0]
 
     def plot(self, a, b):
         assert a < b, "b must be greater than a"
@@ -92,8 +88,7 @@ class GPDataAugmentation:
 
         # augment x with its low-fidelity prediction value
         _x = x.copy()
-        foo = self.__lf_mean_predict(_x)
-        x = np.concatenate([_x, foo])
+        x = np.concatenate([_x, self.__lf_mean_predict(_x)])
         # if n > 0 include lagged values
         for i in range(1, self.n+1):
             x = np.concatenate([x, self.__lf_mean_predict(_x + i * self.tau)])
@@ -105,14 +100,18 @@ class GPDataAugmentation:
         assert len(X) > 0, 'input must be non-empty'
 
         augmented_X = np.array([self.__augment_vector(x) for x in X])
+        self.hf_input_dim = augmented_X.shape[1]
         assert augmented_X.shape[1] == self.input_dims + 2 * self.n + 1
         return augmented_X
 
 
 if __name__ == "__main__":
+
+    # define fidelity models
     def f_high(t): return t**2 - np.sin(8 * pi * t - pi / 10)**2
     def f_low(t): return np.sin(8 * pi * t)
 
+    # prepare data
     hf_size = 20
     lf_size = 80
     train_size = 80
@@ -131,20 +130,22 @@ if __name__ == "__main__":
     y_train_hf = np.array([f_high(t) for t in X_train_hf])
     y_train_lf = np.array([f_high(t) for t in X_train_lf])
 
-    model = GPDataAugmentation(tau=.5, n=1, input_dims=1)
+    y_test = np.array([f_high(t) for t in X_test])
+
+    # create, train, test model
+    model = GPDataAugmentation(tau=.5, n=3, input_dims=1)
     model.lf_fit(lf_X=X_train_lf, lf_Y=y_train_lf)
     model.hf_fit(hf_X=X_train_hf, hf_Y=y_train_hf)
-    model.predict()
+    predictions = model.predict_means(X_test)
+    mse = mean_squared_error(y_true=y_test, y_pred=predictions)
+    print('mean squared error: {}'.format(mse))
 
-
-    # model.hf_fit(X=X_train_hf, lf_Y=y_train_hf)
-    # predictions = model.predict(X=X_test)
 
 # TODO abstract class, multiple implementations of GP Methods inheriting of abstract class
 # TODO child classes:
+# TODO plot method
 #   GP_augmented_data, select better kernel than RBF
 #   NARGP
 #   MFDGP
 # TODO isCheap parameter
 # TODO store plots
-# TODO make tau independent of input dim
