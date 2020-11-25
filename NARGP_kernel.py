@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 
 
 class NARPGKernel(Kern):
-    def __init__(self, input_dim: int, kernClass1: Kern, kernClass2: Kern, kernClass3: Kern, variance=1., lengthscale=1., power=1., ):
+    def __init__(self, input_dim: int, kernClass1: Kern = RBF, kernClass2: Kern = RBF, kernClass3: Kern = RBF, variance=1., lengthscale=1., power=1., ):
         assert input_dim >= 2, "input dimension at least 2"
 
         active_dims = np.arange(0, input_dim)
@@ -43,11 +43,3 @@ class NARPGKernel(Kern):
 
     def plot(self, ):
         self.kernel.plot()
-
-
-X = np.array([[normal(), normal()] for i in range(5)])
-
-kernel = NARPGKernel(2, RBF, RBF, RBF)
-print(kernel.Kdiag(X))
-
-rbf = RBF(2)

@@ -28,26 +28,30 @@ class GPDataAugmentation:
         self.input_dims = input_dims
 
         self.lf_model = None
+        self.lf_X, self.lf_Y = None, None
         self.__lf_mean_predict = None
 
         self.hf_model = None
 
     def lf_fit(self, lf_X, lf_Y):
         assert lf_X.ndim == 2
+        self.lf_X, self.lf_Y = lf_X, lf_Y
         self.lf_model = GPy.models.GPRegression(
             X=lf_X, Y=lf_Y, initialize=True
         )
         self.lf_model.optimize()
-        self.__lf_mean_predict = lambda t: self.lf_model.predict(np.array([t]))[0][0]
+        self.__lf_mean_predict = lambda t: self.lf_model.predict(np.array([t]))[
+            0][0]
 
     def hf_fit(self, hf_X, hf_Y):
-        assert self.lf_model is not None, "low fidelity model musst be initialized"
+        assert self.lf_model is not None, "low fidelity model must be initialized"
         assert hf_X.ndim == 2
+        self.hf_X, self.hf_Y = hf_X, hf_Y
         augmented_hf_X = self.__augment_vector_list(hf_X)
         self.hf_model = GPy.models.GPRegression(
             X=augmented_hf_X, Y=hf_Y, initialize=True
         )
-        self.hf_model.optimize() # ARD
+        self.hf_model.optimize()  # ARD
 
     def predict(self, X_test):
         assert X_test.ndim == 2
@@ -58,14 +62,19 @@ class GPDataAugmentation:
     def predict_means(self, X_test):
         return self.predict(X_test)[0]
 
-    def plot(self, a, b):
-        assert a < b, "b must be greater than a"
+    def plot(self):
+        assert self.input_dims == 1, '2d plots need one-dimensional data'
         assert self.hf_model is not None, 'model is not fitted yet'
 
-        X = np.linspace(a, b, (b - a) * 10)
-        Y = [self.predict(x) for x in X]
-        plt.plot(X, Y, 'ro')
-        plot.show()
+        a, b = np.min(self.lf_X), np.max(self.lf_X) * 2
+
+        X = np.linspace(a, b, 1000)
+        predictions = self.predict_means(X.reshape(-1, 1))
+
+        plt.plot(self.lf_X, self.lf_Y, 'ro', label='low-fidelity')
+        plt.plot(self.hf_X, self.hf_Y, 'bo', label='high-fidelity')
+        plt.plot(X, predictions, label='prediction')
+        plt.show()
 
     def __augment_vector(self, x: np.ndarray):
         assert x.ndim == 1, 'vector to augment must have vector shape'
@@ -99,6 +108,7 @@ if __name__ == "__main__":
     predictions = model.predict_means(X_test)
     mse = mean_squared_error(y_true=y_test, y_pred=predictions)
     print('mean squared error: {}'.format(mse))
+    model.plot()
 
 
 # TODO abstract class, multiple implementations of GP Methods inheriting of abstract class
@@ -108,4 +118,3 @@ if __name__ == "__main__":
 #   NARGP
 #   MFDGP
 # TODO isCheap parameter
-# TODO store plots
