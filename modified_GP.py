@@ -66,14 +66,15 @@ class GPDataAugmentation:
         assert self.input_dims == 1, '2d plots need one-dimensional data'
         assert self.hf_model is not None, 'model is not fitted yet'
 
-        a, b = np.min(self.lf_X), np.max(self.lf_X) * 2
+        a, b = np.min(self.lf_X), np.max(self.lf_X)
 
         X = np.linspace(a, b, 1000)
         predictions = self.predict_means(X.reshape(-1, 1))
 
         plt.plot(self.lf_X, self.lf_Y, 'ro', label='low-fidelity')
         plt.plot(self.hf_X, self.hf_Y, 'bo', label='high-fidelity')
-        plt.plot(X, predictions, label='prediction')
+        plt.plot(X, predictions, label='prediction', linestyle='dashed')
+        plt.legend()
         plt.show()
 
     def __augment_vector(self, x: np.ndarray):
@@ -102,7 +103,7 @@ if __name__ == "__main__":
     X_train_hf, X_train_lf, y_train_hf, y_train_lf, X_test, y_test = get_example_data()
 
     # create, train, test model
-    model = GPDataAugmentation(tau=.5, n=3, input_dims=1)
+    model = GPDataAugmentation(tau=.01, n=1, input_dims=1)
     model.lf_fit(lf_X=X_train_lf, lf_Y=y_train_lf)
     model.hf_fit(hf_X=X_train_hf, hf_Y=y_train_hf)
     predictions = model.predict_means(X_test)
