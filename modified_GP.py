@@ -4,24 +4,37 @@ import matplotlib.pyplot as plt
 from sklearn.datasets import load_boston
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import mean_squared_error
-from abc import ABC, abstractmethod
+import abc
 import pickle
 from NARGP_kernel import NARPGKernel
 from datasets import get_example_data
 import random
 from math import pi
 
+class AbstractGP(metaclass=abc.ABCMeta):
 
-class GPDataAugmentation:
+    @abc.abstractmethod
+    def predict(self, X_test):
+        pass
 
-    def __init__(self, tau: float, n: int, input_dims: int):
+    @abc.abstractmethod
+    def plot(self):
+        pass
+
+class GPDataAugmentation(AbstractGP):
+
+    def __init__(self, tau: float, n: int, input_dims: int, f_low: callable=None):
         '''
-        input: lff
-            low fidelity function
         input: tau
             distance to neighbour points used in taylor expansion
         input n: 
-            number of lags in the augmentation process (2*n + 1)
+            number of derivatives which will be included when training the high-fidelity model,
+            adds 2*n+1 dimensions to the high-fidelity training data
+        input input_dims:
+            dimensionality of the input data
+        input f_low:
+            closed form of a low-fidelity prediction function, 
+            if not provided, call self.lf_fit() to train a low-fidelity GP which will be used for low-fidelity predictions instead
         '''
         self.tau = tau
         self.n = n
@@ -29,11 +42,13 @@ class GPDataAugmentation:
 
         self.lf_model = None
         self.lf_X, self.lf_Y = None, None
-        self.__lf_mean_predict = None
+        self.__lf_mean_predict = f_low
 
         self.hf_model = None
 
     def lf_fit(self, lf_X, lf_Y):
+        print(self.__lf_mean_predict)
+        assert self.__lf_mean_predict is None, 'low-fidelity already specified'
         assert lf_X.ndim == 2
         self.lf_X, self.lf_Y = lf_X, lf_Y
         self.lf_model = GPy.models.GPRegression(
@@ -44,7 +59,7 @@ class GPDataAugmentation:
             0][0]
 
     def hf_fit(self, hf_X, hf_Y):
-        assert self.lf_model is not None, "low fidelity model must be initialized"
+        assert self.__lf_mean_predict is not None, "low-fidelity predict function must be given"
         assert hf_X.ndim == 2
         self.hf_X, self.hf_Y = hf_X, hf_Y
         augmented_hf_X = self.__augment_vector_list(hf_X)
@@ -66,10 +81,14 @@ class GPDataAugmentation:
         assert self.input_dims == 1, '2d plots need one-dimensional data'
         assert self.hf_model is not None, 'model is not fitted yet'
 
-        a, b = np.min(self.lf_X), np.max(self.lf_X)
+        a, b = np.min(self.hf_X), np.max(self.hf_X)
 
         X = np.linspace(a, b, 1000)
         predictions = self.predict_means(X.reshape(-1, 1))
+
+        if (self.lf_Y is None):
+            self.lf_X = np.linspace(a, b, 50)
+            self.lf_Y = np.array([self.__lf_mean_predict(x) for x in self.lf_X])
 
         plt.plot(self.lf_X, self.lf_Y, 'ro', label='low-fidelity')
         plt.plot(self.hf_X, self.hf_Y, 'bo', label='high-fidelity')
@@ -103,6 +122,7 @@ if __name__ == "__main__":
     X_train_hf, X_train_lf, y_train_hf, y_train_lf, X_test, y_test = get_example_data()
 
     # create, train, test model
+    def f_low(t): return np.sin(8 * pi * t)
     model = GPDataAugmentation(tau=.01, n=1, input_dims=1)
     model.lf_fit(lf_X=X_train_lf, lf_Y=y_train_lf)
     model.hf_fit(hf_X=X_train_hf, hf_Y=y_train_hf)
@@ -112,7 +132,6 @@ if __name__ == "__main__":
     model.plot()
 
 
-# TODO abstract class, multiple implementations of GP Methods inheriting of abstract class
 # TODO child classes:
 # TODO plot method
 #   GP_augmented_data, select better kernel than RBF
