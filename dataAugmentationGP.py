@@ -4,24 +4,11 @@ import matplotlib.pyplot as plt
 from sklearn.datasets import load_boston
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import mean_squared_error
-import abc
-import pickle
-from NARGP_kernel import NARPGKernel
 from datasets import get_example_data
-import random
 from math import pi
+from abstractGP import AbstractGP
 
-class AbstractGP(metaclass=abc.ABCMeta):
-
-    @abc.abstractmethod
-    def predict(self, X_test):
-        pass
-
-    @abc.abstractmethod
-    def plot(self):
-        pass
-
-class GPDataAugmentation(AbstractGP):
+class DataAugmentationGP(AbstractGP):
 
     def __init__(self, tau: float, n: int, input_dims: int, f_low: callable=None):
         '''
@@ -123,7 +110,7 @@ if __name__ == "__main__":
 
     # create, train, test model
     def f_low(t): return np.sin(8 * pi * t)
-    model = GPDataAugmentation(tau=.01, n=1, input_dims=1)
+    model = DataAugmentationGP(tau=.01, n=1, input_dims=1)
     model.lf_fit(lf_X=X_train_lf, lf_Y=y_train_lf)
     model.hf_fit(hf_X=X_train_hf, hf_Y=y_train_hf)
     predictions = model.predict_means(X_test)
