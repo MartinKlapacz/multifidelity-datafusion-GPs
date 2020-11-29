@@ -1,16 +1,24 @@
 import GPy
 import numpy as np
 import matplotlib.pyplot as plt
-from sklearn.datasets import load_boston
-from sklearn.model_selection import train_test_split
-from sklearn.metrics import mean_squared_error
-from datasets import get_example_data
-from math import pi
 from abstractGP import AbstractGP
+
+def augmentIter(n):
+    i = 0
+    sign = -1
+    while i < n or sign == 1:
+        if i == 0: yield 0
+        if sign == 1:
+            sign = -1
+        else:
+            sign = 1
+            i += 1
+        yield sign * i
+
 
 class DataAugmentationGP(AbstractGP):
 
-    def __init__(self, tau: float, n: int, input_dims: int, f_low: callable=None):
+    def __init__(self, tau: float, n: int, input_dims: int, f_low: callable=None, lf_X: np.ndarray=None, lf_Y: np.ndarray=None):
         '''
         input: tau
             distance to neighbour points used in taylor expansion
@@ -26,30 +34,27 @@ class DataAugmentationGP(AbstractGP):
         self.tau = tau
         self.n = n
         self.input_dims = input_dims
-
-        self.lf_model = None
-        self.lf_X, self.lf_Y = None, None
-        self.__lf_mean_predict = f_low
-
         self.hf_model = None
 
-    def lf_fit(self, lf_X, lf_Y):
-        print(self.__lf_mean_predict)
-        assert self.__lf_mean_predict is None, 'low-fidelity already specified'
-        assert lf_X.ndim == 2
-        self.lf_X, self.lf_Y = lf_X, lf_Y
-        self.lf_model = GPy.models.GPRegression(
-            X=lf_X, Y=lf_Y, initialize=True
-        )
-        self.lf_model.optimize()
-        self.__lf_mean_predict = lambda t: self.lf_model.predict(np.array([t]))[
-            0][0]
+        lf_model_params_are_valid = (f_low is not None) ^ ((lf_X is not None) and (lf_Y is not None))
+        assert lf_model_params_are_valid, 'define low-fidelity model either by mean function or by Data'
 
-    def hf_fit(self, hf_X, hf_Y):
+        self.data_driven_lf_approach = f_low is None
+        if self.data_driven_lf_approach:
+            self.lf_X, self.lf_Y = lf_X, lf_Y
+            self.lf_model = GPy.models.GPRegression(
+                X=lf_X, Y=lf_Y, initialize=True
+            )
+            self.lf_model.optimize()
+            self.__lf_mean_predict = lambda t: self.lf_model.predict(t)[0]
+        else:
+            self.__lf_mean_predict = f_low
+
+    def fit(self, hf_X, hf_Y):
         assert self.__lf_mean_predict is not None, "low-fidelity predict function must be given"
         assert hf_X.ndim == 2
         self.hf_X, self.hf_Y = hf_X, hf_Y
-        augmented_hf_X = self.__augment_vector_list(hf_X)
+        augmented_hf_X = self.__augment_Data(hf_X)
         self.hf_model = GPy.models.GPRegression(
             X=augmented_hf_X, Y=hf_Y, initialize=True
         )
@@ -58,7 +63,7 @@ class DataAugmentationGP(AbstractGP):
     def predict(self, X_test):
         assert X_test.ndim == 2
         assert X_test.shape[1] == self.input_dims
-        X_test = self.__augment_vector_list(X_test)
+        X_test = self.__augment_Data(X_test)
         return self.hf_model.predict(X_test)
 
     def predict_means(self, X_test):
@@ -70,12 +75,12 @@ class DataAugmentationGP(AbstractGP):
 
         a, b = np.min(self.hf_X), np.max(self.hf_X)
 
-        X = np.linspace(a, b, 1000)
+        X = np.linspace(a, b, 500)
         predictions = self.predict_means(X.reshape(-1, 1))
 
-        if (self.lf_Y is None):
+        if (not self.data_driven_lf_approach):
             self.lf_X = np.linspace(a, b, 50)
-            self.lf_Y = np.array([self.__lf_mean_predict(x) for x in self.lf_X])
+            self.lf_Y = self.__lf_mean_predict(self.lf_X)
 
         plt.plot(self.lf_X, self.lf_Y, 'ro', label='low-fidelity')
         plt.plot(self.hf_X, self.hf_Y, 'bo', label='high-fidelity')
@@ -83,41 +88,13 @@ class DataAugmentationGP(AbstractGP):
         plt.legend()
         plt.show()
 
-    def __augment_vector(self, x: np.ndarray):
-        assert x.ndim == 1, 'vector to augment must have vector shape'
-
-        # augment x with its low-fidelity prediction value
-        _x = x.copy()
-        x = np.concatenate([_x, self.__lf_mean_predict(_x)])
-        # if n > 0 include lagged values
-        for i in range(1, self.n+1):
-            x = np.concatenate([x, self.__lf_mean_predict(_x + i * self.tau)])
-            x = np.concatenate([x, self.__lf_mean_predict(_x - i * self.tau)])
-        return x
-
-    def __augment_vector_list(self, X):
+    def __augment_Data(self, X):
         assert isinstance(X, np.ndarray), 'input must be an array'
         assert len(X) > 0, 'input must be non-empty'
-
-        augmented_X = np.array([self.__augment_vector(x) for x in X])
-        self.hf_input_dim = augmented_X.shape[1]
-        assert augmented_X.shape[1] == self.input_dims + 2 * self.n + 1
-        return augmented_X
-
-
-if __name__ == "__main__":
-    X_train_hf, X_train_lf, y_train_hf, y_train_lf, X_test, y_test = get_example_data()
-
-    # create, train, test model
-    def f_low(t): return np.sin(8 * pi * t)
-    model = DataAugmentationGP(tau=.01, n=1, input_dims=1)
-    model.lf_fit(lf_X=X_train_lf, lf_Y=y_train_lf)
-    model.hf_fit(hf_X=X_train_hf, hf_Y=y_train_hf)
-    predictions = model.predict_means(X_test)
-    mse = mean_squared_error(y_true=y_test, y_pred=predictions)
-    print('mean squared error: {}'.format(mse))
-    model.plot()
-
+        augmented_X = np.concatenate([
+            self.__lf_mean_predict(X + i * self.tau) for i in augmentIter(self.n)
+        ], axis=1)
+        return np.concatenate([X, augmented_X], axis=1)
 
 # TODO child classes:
 # TODO plot method

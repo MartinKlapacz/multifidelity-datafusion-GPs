@@ -18,8 +18,8 @@ def get_Mauna_Loa_data(reduce_by: int = 1):
 
 def get_example_data():
     # define fidelity models
-    def f_high(t): return t**2 + np.sin(8 * pi * t + pi / 10)**2
     def f_low(t): return np.sin(8 * pi * t)
+    def f_high(t): return (t - 1.41) * f_low(t)**2
 
     # prepare data
     hf_size = 20
