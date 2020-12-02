@@ -42,4 +42,4 @@ def get_example_data():
     
     y_test = np.array([f_high(t) for t in X_test])
 
-    return X_train_hf, X_train_lf, y_train_hf, y_train_lf, X_test, y_test
+    return X_train_hf, X_train_lf, y_train_lf, X_test, y_test

@@ -18,7 +18,7 @@ def augmentIter(n):
 
 class DataAugmentationGP(AbstractGP):
 
-    def __init__(self, tau: float, n: int, input_dims: int, f_low: callable=None, lf_X: np.ndarray=None, lf_Y: np.ndarray=None):
+    def __init__(self, tau: float, n: int, input_dims: int, f_high: callable, f_low: callable=None, lf_X: np.ndarray=None, lf_Y: np.ndarray=None):
         '''
         input: tau
             distance to neighbour points used in taylor expansion
@@ -34,7 +34,7 @@ class DataAugmentationGP(AbstractGP):
         self.tau = tau
         self.n = n
         self.input_dims = input_dims
-        self.hf_model = None
+        self.hf_model = f_high
 
         lf_model_params_are_valid = (f_low is not None) ^ ((lf_X is not None) and (lf_Y is not None))
         assert lf_model_params_are_valid, 'define low-fidelity model either by mean function or by Data'
@@ -50,15 +50,35 @@ class DataAugmentationGP(AbstractGP):
         else:
             self.__lf_mean_predict = f_low
 
-    def fit(self, hf_X, hf_Y):
+    def fit(self, hf_X):
         assert self.__lf_mean_predict is not None, "low-fidelity predict function must be given"
         assert hf_X.ndim == 2
-        self.hf_X, self.hf_Y = hf_X, hf_Y
+        self.hf_X, self.hf_Y = hf_X, self.hf_model(hf_X)
         augmented_hf_X = self.__augment_Data(hf_X)
         self.hf_model = GPy.models.GPRegression(
-            X=augmented_hf_X, Y=hf_Y, initialize=True
+            X=augmented_hf_X, Y=self.hf_Y, initialize=True
         )
         self.hf_model.optimize()  # ARD
+
+    def adapt(self, num_steps):
+        # do the same with low fidelity, with more steps (ration * numsteps) ration given in __init__ 
+        for i in range(num_steps):
+            # find x with highest variance
+            x = 342
+            high_y = self.hf_model(x)
+            low_y = self.f_low(x)
+            lagged_y1 = self.f_low(x - tau)
+            lagged_y2 = self.f_low(x + tau)
+            # use __augment_Data
+
+# add confidence interval to plot()
+# second plot() time series 
+# use NARPG kernel
+# complete adapt (just for high) (look in GPY, bayesian optimization toolbox)
+# complete adapt (for low)
+# combine both
+# check results 
+# describe the process
 
     def predict(self, X_test):
         assert X_test.ndim == 2
@@ -91,14 +111,11 @@ class DataAugmentationGP(AbstractGP):
     def __augment_Data(self, X):
         assert isinstance(X, np.ndarray), 'input must be an array'
         assert len(X) > 0, 'input must be non-empty'
-        augmented_X = np.concatenate([
+        new_entries = np.concatenate([
             self.__lf_mean_predict(X + i * self.tau) for i in augmentIter(self.n)
         ], axis=1)
-        return np.concatenate([X, augmented_X], axis=1)
+        return np.concatenate([X, new_entries], axis=1)
 
-# TODO child classes:
-# TODO plot method
 #   GP_augmented_data, select better kernel than RBF
 #   NARGP
 #   MFDGP
-# TODO isCheap parameter
