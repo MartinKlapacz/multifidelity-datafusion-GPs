@@ -92,12 +92,18 @@ class DataAugmentationGP(AbstractGP):
     def plot(self):
         assert self.input_dims == 1, '2d plots need one-dimensional data'
         assert self.hf_model is not None, 'model is not fitted yet'
+        self.__plot(0)
 
+    def plot_forecast(self):
+        forecast_range = .5
+        self.__plot(forecast_range)
+
+    def __plot(self, exceed_range_by):
         a, b = np.min(self.hf_X), np.max(self.hf_X)
-
-        X = np.linspace(a, b, 500)
+        point_density = 500
+        X = np.linspace(a, b * (1 + exceed_range_by), int(point_density * (1 + exceed_range_by)))
         predictions = self.predict_means(X.reshape(-1, 1))
-
+        
         if (not self.data_driven_lf_approach):
             self.lf_X = np.linspace(a, b, 50)
             self.lf_Y = self.__lf_mean_predict(self.lf_X)

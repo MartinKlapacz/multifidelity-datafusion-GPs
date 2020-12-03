@@ -10,7 +10,7 @@ if __name__ == "__main__":
     def f_high(t): return (t - 1.41) * f_low(t)**2
 
     # create, train, test model
-    model = DataAugmentationGP(tau=.001, n=4, input_dims=1, f_high=f_high, f_low=f_low)
+    model = DataAugmentationGP(tau=.001, n=2, input_dims=1, f_high=f_high, f_low=f_low)
 
     model.fit(hf_X=X_train_hf)
 
