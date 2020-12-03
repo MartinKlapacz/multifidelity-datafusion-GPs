@@ -34,7 +34,7 @@ class DataAugmentationGP(AbstractGP):
         self.tau = tau
         self.n = n
         self.input_dims = input_dims
-        self.hf_model = f_high
+        self.f_high = f_high
 
         lf_model_params_are_valid = (f_low is not None) ^ ((lf_X is not None) and (lf_Y is not None))
         assert lf_model_params_are_valid, 'define low-fidelity model either by mean function or by Data'
@@ -51,21 +51,20 @@ class DataAugmentationGP(AbstractGP):
             self.__lf_mean_predict = f_low
 
     def fit(self, hf_X):
-        assert self.__lf_mean_predict is not None, "low-fidelity predict function must be given"
-        assert hf_X.ndim == 2
-        self.hf_X, self.hf_Y = hf_X, self.hf_model(hf_X)
+        hf_X = hf_X.reshape(-1, 1)
+        self.hf_X, self.hf_Y = hf_X, self.f_high(hf_X)
         augmented_hf_X = self.__augment_Data(hf_X)
-        self.hf_model = GPy.models.GPRegression(
+        self.f_high = GPy.models.GPRegression(
             X=augmented_hf_X, Y=self.hf_Y, initialize=True
         )
-        self.hf_model.optimize()  # ARD
+        self.f_high.optimize()  # ARD
 
     def adapt(self, num_steps):
         # do the same with low fidelity, with more steps (ration * numsteps) ration given in __init__ 
         for i in range(num_steps):
             # find x with highest variance
             x = 342
-            high_y = self.hf_model(x)
+            high_y = self.f_high(x)
             low_y = self.f_low(x)
             lagged_y1 = self.f_low(x - tau)
             lagged_y2 = self.f_low(x + tau)
@@ -84,14 +83,14 @@ class DataAugmentationGP(AbstractGP):
         assert X_test.ndim == 2
         assert X_test.shape[1] == self.input_dims
         X_test = self.__augment_Data(X_test)
-        return self.hf_model.predict(X_test)
+        return self.f_high.predict(X_test)
 
     def predict_means(self, X_test):
         return self.predict(X_test)[0]
 
     def plot(self):
         assert self.input_dims == 1, '2d plots need one-dimensional data'
-        assert self.hf_model is not None, 'model is not fitted yet'
+        assert self.f_high is not None, 'model is not fitted yet'
         self.__plot(0)
 
     def plot_forecast(self):
@@ -103,7 +102,7 @@ class DataAugmentationGP(AbstractGP):
         point_density = 500
         X = np.linspace(a, b * (1 + exceed_range_by), int(point_density * (1 + exceed_range_by)))
         predictions = self.predict_means(X.reshape(-1, 1))
-        
+
         if (not self.data_driven_lf_approach):
             self.lf_X = np.linspace(a, b, 50)
             self.lf_Y = self.__lf_mean_predict(self.lf_X)

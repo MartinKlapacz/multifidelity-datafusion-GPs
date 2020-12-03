@@ -5,12 +5,12 @@ from datasets import get_example_data
 
 
 if __name__ == "__main__":
-    X_train_hf, X_train_lf, y_train_lf, X_test, y_test = get_example_data()
-    def f_low(t): return np.sin(8 * np.pi * t)
-    def f_high(t): return (t - 1.41) * f_low(t)**2
+    X_train_hf, X_train_lf, y_train_lf, f_high, f_low, X_test, y_test = get_example_data()
 
     # create, train, test model
-    model = DataAugmentationGP(tau=.001, n=2, input_dims=1, f_high=f_high, f_low=f_low)
+    model = DataAugmentationGP(
+        tau=.001, n=2, input_dims=1, f_high=f_high, f_low=f_low
+    )
 
     model.fit(hf_X=X_train_hf)
 
