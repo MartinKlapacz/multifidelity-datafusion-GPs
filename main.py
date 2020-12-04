@@ -9,7 +9,7 @@ if __name__ == "__main__":
 
     # create, train, test model
     model = DataAugmentationGP(
-        tau=.001, n=2, input_dims=1, f_high=f_high, f_low=f_low
+        tau=.001, n=1, input_dims=1, f_high=f_high, f_low=f_low
     )
 
     model.fit(hf_X=X_train_hf)
@@ -18,4 +18,4 @@ if __name__ == "__main__":
 
     mse = mean_squared_error(y_true=y_test, y_pred=predictions)
     print('mean squared error: {}'.format(mse))
-    model.plot()
+    model.plot_forecast(1)
