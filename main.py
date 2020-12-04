@@ -9,7 +9,7 @@ if __name__ == "__main__":
 
     # create, train, test model
     model = DataAugmentationGP(
-        tau=.001, n=1, input_dims=1, f_high=f_high, f_low=f_low
+        tau=.001, n=0, input_dims=1, f_high=f_high, f_low=f_low
     )
 
     model.fit(hf_X=X_train_hf)

@@ -5,7 +5,7 @@ from numpy.random import normal
 import matplotlib.pyplot as plt
 
 
-class NARPGKernel(Kern):
+class NARPGKernel():
     def __init__(self, input_dim: int, kernClass1: Kern = RBF, kernClass2: Kern = RBF, kernClass3: Kern = RBF, variance=1., lengthscale=1., power=1., ):
         assert input_dim >= 2, "input dimension at least 2"
 

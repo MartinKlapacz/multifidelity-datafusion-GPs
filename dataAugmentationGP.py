@@ -2,20 +2,25 @@ import GPy
 import numpy as np
 import matplotlib.pyplot as plt
 from abstractGP import AbstractGP
+from NARGP_kernel import NARPGKernel
+
 
 def augmentIter(n):
     # generates a number sequence 0, -1, 1, -2, 2, ..., -n, n
-    i = 0
-    sign = -1
-    while i < n or sign == 1:
-        if i == 0:
-            yield 0
-        if sign == 1:
-            sign = -1
-        else:
-            sign = 1
-            i += 1
-        yield sign * i
+    if n == 0:
+        yield 0
+    else: 
+        i = 0
+        sign = -1
+        while i < n or sign == 1:
+            if i == 0:
+                yield 0
+            if sign == 1:
+                sign = -1
+            else:
+                sign = 1
+                i += 1
+            yield sign * i
 
 
 class DataAugmentationGP(AbstractGP):
@@ -59,7 +64,7 @@ class DataAugmentationGP(AbstractGP):
         self.hf_X, self.hf_Y = hf_X, self.__f_high_real(hf_X)
         augmented_hf_X = self.__augment_Data(hf_X)
         self.hf_model = GPy.models.GPRegression(
-            X=augmented_hf_X, Y=self.hf_Y, initialize=True
+            X=augmented_hf_X, Y=self.hf_Y,kernel=None, initialize=True
         )
         self.hf_model.optimize()  # ARD
 
