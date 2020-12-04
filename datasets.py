@@ -16,12 +16,28 @@ def get_Mauna_Loa_data(reduce_by: int = 1):
     return X_train, y_train, X_test, y_test
 
 
-def get_example_data():
-    # define fidelity models
+def get_example_data1():
+    def f_low(t): return np.sin(8 * pi * t)
+    def f_high(t): return np.sin(8 * pi * t)**2
+    return get_example_data(f_low, f_high)
+
+def get_example_data2():
+    def f_low(t): return np.sin(8 * pi * t)
+    def f_high(t): return t**2 * f_low(t)**2
+    return get_example_data(f_low, f_high)
+
+def get_example_data3():
+    def f_low(t): return np.sin(8 * pi * t)
+    def f_high(t): return t**2 * np.sin(8 * pi * t + pi / 10)**2
+    return get_example_data(f_low, f_high)
+
+def get_example_data4():
     def f_low(t): return np.sin(8 * pi * t)
     def f_high(t): return (t - 1.41) * f_low(t)**2
+    return get_example_data(f_low, f_high)
 
-    # prepare data
+
+def get_example_data(f_low, f_high):
     hf_size = 20
     lf_size = 80
     N = lf_size + hf_size

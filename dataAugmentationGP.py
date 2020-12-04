@@ -3,8 +3,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 from abstractGP import AbstractGP
 
-
 def augmentIter(n):
+    # generates a number sequence 0, -1, 1, -2, 2, ..., -n, n
     i = 0
     sign = -1
     while i < n or sign == 1:

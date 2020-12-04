@@ -1,11 +1,11 @@
 import numpy as np
 from dataAugmentationGP import DataAugmentationGP
 from sklearn.metrics import mean_squared_error
-from datasets import get_example_data
+from datasets import get_example_data1, get_example_data2, get_example_data3, get_example_data4
 
 
 if __name__ == "__main__":
-    X_train_hf, X_train_lf, y_train_lf, f_high, f_low, X_test, y_test = get_example_data()
+    X_train_hf, X_train_lf, y_train_lf, f_high, f_low, X_test, y_test = get_example_data4()
 
     # create, train, test model
     model = DataAugmentationGP(
@@ -18,4 +18,4 @@ if __name__ == "__main__":
 
     mse = mean_squared_error(y_true=y_test, y_pred=predictions)
     print('mean squared error: {}'.format(mse))
-    model.plot_forecast(1)
+    model.plot_forecast(1.5)
