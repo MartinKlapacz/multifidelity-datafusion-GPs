@@ -63,6 +63,8 @@ class DataAugmentationGP(AbstractGP):
         hf_X = hf_X.reshape(-1, 1)
         self.hf_X, self.hf_Y = hf_X, self.__f_high_real(hf_X)
         augmented_hf_X = self.__augment_Data(hf_X)
+
+        kernel = NARPGKernel(input_dim=1, n=self.n)
         self.hf_model = GPy.models.GPRegression(
             X=augmented_hf_X, Y=self.hf_Y,kernel=None, initialize=True
         )

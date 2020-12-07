@@ -5,16 +5,16 @@ from numpy.random import normal
 import matplotlib.pyplot as plt
 
 
-class NARPGKernel():
-    def __init__(self, input_dim: int, kernClass1: Kern = RBF, kernClass2: Kern = RBF, kernClass3: Kern = RBF, variance=1., lengthscale=1., power=1., ):
-        assert input_dim >= 2, "input dimension at least 2"
+class NARPGKernel(Kern):
+    def __init__(self, input_dim: int, n: int, kernClass1: Kern = RBF, kernClass2: Kern = RBF, kernClass3: Kern = RBF, variance=1., lengthscale=1., power=1., ):
+        super(NARPGKernel, self).__init__(input_dim, np.arange(input_dim), 'NARGPKernel')
+        standard_entries = np.arange(0, input_dim)
+        augm_length = 2*n+1
+        augm_entries = np.arange(input_dim, input_dim + augm_length)
 
-        active_dims = np.arange(0, input_dim)
-        super(NARPGKernel, self).__init__(input_dim, active_dims, 'NARGP')
-
-        kern1 = kernClass1(input_dim,   active_dims=active_dims, ARD=True)
-        kern2 = kernClass2(input_dim=1, active_dims=[input_dim-1], ARD=True)
-        kern3 = kernClass3(input_dim,   active_dims=active_dims, ARD=True)
+        kern1 = kernClass1(input_dim, active_dims=standard_entries, ARD=True)
+        kern3 = kernClass3(input_dim, active_dims=standard_entries, ARD=True)
+        kern2 = kernClass2(input_dim=augm_entries, active_dims=augm_entries, ARD=True)
 
         self.kernel = kern1 * kern2 + kern3
         self.variance = Param('variance', self.kernel)
