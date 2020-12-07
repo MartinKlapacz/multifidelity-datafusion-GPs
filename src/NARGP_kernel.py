@@ -5,20 +5,23 @@ from numpy.random import normal
 import matplotlib.pyplot as plt
 
 
-class NARPGKernel(Kern):
-    def __init__(self, input_dim: int, n: int, kernClass1: Kern = RBF, kernClass2: Kern = RBF, kernClass3: Kern = RBF, variance=1., lengthscale=1., power=1., ):
-        super(NARPGKernel, self).__init__(input_dim, np.arange(input_dim), 'NARGPKernel')
-        standard_entries = np.arange(0, input_dim)
-        augm_length = 2*n+1
-        augm_entries = np.arange(input_dim, input_dim + augm_length)
+class NARGPKernel(Kern):
+    def __init__(self, input_dim: int, n: int, kernClass1: Kern = RBF, kernClass2: Kern = RBF, kernClass3: Kern = RBF,):
+        super(NARGPKernel, self).__init__(
+            input_dim, np.arange(input_dim), 'NARGPKernel')
+        augm_dim = 2*n+1
+        standard_entries = np.arange(0, input_dim - augm_dim)
+        augm_entries = np.arange(input_dim - augm_dim, input_dim)
 
-        kern1 = kernClass1(input_dim, active_dims=standard_entries, ARD=True)
-        kern3 = kernClass3(input_dim, active_dims=standard_entries, ARD=True)
-        kern2 = kernClass2(input_dim=augm_entries, active_dims=augm_entries, ARD=True)
+        self.kern1 = kernClass1(len(standard_entries), active_dims=standard_entries, ARD=True)
+        self.kern2 = kernClass2(len(augm_entries),active_dims=augm_entries, ARD=True)
+        self.kern3 = kernClass3(len(standard_entries), active_dims=standard_entries, ARD=True)
 
-        self.kernel = kern1 * kern2 + kern3
+        self.kernel = self.kern3 * self.kern2 + self.kern3
+
         self.variance = Param('variance', self.kernel)
         self.lengthscale = Param('lengtscale', self.kernel)
+        # self.add_parameters(self.variance, self.lengthscale)
 
     def __str__(self):
         return self.kernel.__str__()
@@ -43,3 +46,9 @@ class NARPGKernel(Kern):
 
     def plot(self, ):
         self.kernel.plot()
+
+    def update_gradients_full(self, dL_dK, X, X2=None):
+        # todo: correct implementation
+        self.kern1.update_gradients_full(dL_dK, X, X2)
+        self.kern2.update_gradients_full(dL_dK, X, X2)
+        self.kern3.update_gradients_full(dL_dK, X, X2)

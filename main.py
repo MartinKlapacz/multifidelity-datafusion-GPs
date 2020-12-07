@@ -1,7 +1,7 @@
 import numpy as np
 from sklearn.metrics import mean_squared_error
-from src.dataAugmentationGP import DataAugmentationGP
-from src.exampleDatasets import get_example_data1, get_example_data2, get_example_data3, get_example_data4
+from src import get_example_data1, get_example_data2, get_example_data3, get_example_data4
+from src import DataAugmentationGP
 
 
 if __name__ == "__main__":
@@ -9,7 +9,7 @@ if __name__ == "__main__":
 
     # create, train, test model
     model = DataAugmentationGP(
-        tau=.001, n=0, input_dims=1, f_high=f_high, f_low=f_low
+        tau=.001, n=0, input_dim=1, f_high=f_high, f_low=f_low
     )
 
     model.fit(hf_X=X_train_hf)

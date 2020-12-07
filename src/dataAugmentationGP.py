@@ -2,14 +2,16 @@ import GPy
 import numpy as np
 import matplotlib.pyplot as plt
 
-from .abstractGP import AbstractGP
-from .NARGP_kernel import NARPGKernel
+from src.abstractGP import AbstractGP
+from src.NARGP_kernel import NARGPKernel
+
+
 
 def augmentIter(n):
     # generates a number sequence 0, -1, 1, -2, 2, ..., -n, n
     if n == 0:
         yield 0
-    else: 
+    else:
         i = 0
         sign = -1
         while i < n or sign == 1:
@@ -25,14 +27,14 @@ def augmentIter(n):
 
 class DataAugmentationGP(AbstractGP):
 
-    def __init__(self, tau: float, n: int, input_dims: int, f_high: callable, f_low: callable = None, lf_X: np.ndarray = None, lf_Y: np.ndarray = None):
+    def __init__(self, tau: float, n: int, input_dim: int, f_high: callable, f_low: callable = None, lf_X: np.ndarray = None, lf_Y: np.ndarray = None):
         '''
         input: tau
             distance to neighbour points used in taylor expansion
         input n: 
             number of derivatives which will be included when training the high-fidelity model,
             adds 2*n+1 dimensions to the high-fidelity training data
-        input input_dims:
+        input input_dim:
             dimensionality of the input data
         input f_low:
             closed form of a low-fidelity prediction function, 
@@ -40,7 +42,7 @@ class DataAugmentationGP(AbstractGP):
         '''
         self.tau = tau
         self.n = n
-        self.input_dims = input_dims
+        self.input_dim = input_dim
         self.__f_high_real = f_high
         self.f_low = f_low
 
@@ -61,12 +63,14 @@ class DataAugmentationGP(AbstractGP):
 
     def fit(self, hf_X):
         hf_X = hf_X.reshape(-1, 1)
-        self.hf_X, self.hf_Y = hf_X, self.__f_high_real(hf_X)
+        self.hf_X, self.hf_Y = hf_X, self.__f_high_real(hf_X) # high fidelity data is as precise as ground truth data
+        # augment input data before prediction
         augmented_hf_X = self.__augment_Data(hf_X)
 
-        kernel = NARPGKernel(input_dim=1, n=self.n)
+        kernel = NARGPKernel(input_dim=augmented_hf_X.shape[1], n=self.n)
+
         self.hf_model = GPy.models.GPRegression(
-            X=augmented_hf_X, Y=self.hf_Y,kernel=None, initialize=True
+            X=augmented_hf_X, Y=self.hf_Y, kernel=kernel, initialize=True
         )
         self.hf_model.optimize()  # ARD
 
@@ -82,7 +86,7 @@ class DataAugmentationGP(AbstractGP):
             # use __augment_Data
 
 # add confidence interval to plot()
-# use NARPG kernel
+# use NARGP kernel
 # complete adapt (just for high) (look in GPY, bayesian optimization toolbox)
 # complete adapt (for low)
 # combine both
@@ -91,7 +95,7 @@ class DataAugmentationGP(AbstractGP):
 
     def predict(self, X_test):
         assert X_test.ndim == 2
-        assert X_test.shape[1] == self.input_dims
+        assert X_test.shape[1] == self.input_dim
         X_test = self.__augment_Data(X_test)
         return self.hf_model.predict(X_test)
 
@@ -99,7 +103,7 @@ class DataAugmentationGP(AbstractGP):
         return self.predict(X_test)[0]
 
     def plot(self):
-        assert self.input_dims == 1, '2d plots need one-dimensional data'
+        assert self.input_dim == 1, '2d plots need one-dimensional data'
         assert self.f_high is not None, 'model is not fitted yet'
         self.__plot()
 
