@@ -1,7 +1,7 @@
 import numpy as np
-from dataAugmentationGP import DataAugmentationGP
 from sklearn.metrics import mean_squared_error
-from datasets import get_example_data1, get_example_data2, get_example_data3, get_example_data4
+from src.dataAugmentationGP import DataAugmentationGP
+from src.exampleDatasets import get_example_data1, get_example_data2, get_example_data3, get_example_data4
 
 
 if __name__ == "__main__":
@@ -18,4 +18,4 @@ if __name__ == "__main__":
 
     mse = mean_squared_error(y_true=y_test, y_pred=predictions)
     print('mean squared error: {}'.format(mse))
-    model.plot_forecast(1.5)
+    model.plot_forecast(1.5)    
