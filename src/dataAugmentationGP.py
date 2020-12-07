@@ -1,9 +1,9 @@
 import GPy
 import numpy as np
 import matplotlib.pyplot as plt
-from abstractGP import AbstractGP
-from NARGP_kernel import NARPGKernel
 
+from .abstractGP import AbstractGP
+from .NARGP_kernel import NARPGKernel
 
 def augmentIter(n):
     # generates a number sequence 0, -1, 1, -2, 2, ..., -n, n
