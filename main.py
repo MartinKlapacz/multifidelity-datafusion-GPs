@@ -1,5 +1,4 @@
 import numpy as np
-from sklearn.metrics import mean_squared_error
 from src import get_example_data1, get_example_data2, get_example_data3, get_example_data4
 from src import DataAugmentationGP
 
@@ -14,8 +13,8 @@ if __name__ == "__main__":
 
     model.fit(hf_X=X_train_hf)
 
-    predictions = model.predict_means(X_test)
+    model.assess_mse(X_test=X_test, y_test=y_test)
 
-    mse = mean_squared_error(y_true=y_test, y_pred=predictions)
-    print('mean squared error: {}'.format(mse))
-    model.plot_forecast(1.5)    
+    model.adapt_hf(5)
+
+    model.assess_mse(X_test=X_test, y_test=y_test)
