@@ -1,6 +1,8 @@
 import numpy as np
 from src import get_example_data1, get_example_data2, get_example_data3, get_example_data4
 from src import DataAugmentationGP
+import GPy
+import matplotlib.pyplot as plt
 
 
 if __name__ == "__main__":
@@ -14,6 +16,10 @@ if __name__ == "__main__":
 
     model.fit(hf_X=X_train_hf)
 
-    model.adapt(5)
+    model.assess_mse(X_test, y_test)
 
-    model.plot_forecast(5)
+    model.adapt(10)
+    model.assess_mse(X_test, y_test)
+
+
+    model.plot()

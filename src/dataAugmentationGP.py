@@ -6,6 +6,7 @@ from src.abstractGP import AbstractGP
 from src.NARGP_kernel import NARGPKernel
 from src.augmentationIterators import augmentIter
 from sklearn.metrics import mean_squared_error
+from time import sleep
 
 
 class DataAugmentationGP(AbstractGP):
@@ -30,6 +31,9 @@ class DataAugmentationGP(AbstractGP):
         self.f_low = f_low
         self.a = self.b = None
 
+        self.acquired_X = []
+        self.acquired_y = []
+
         lf_model_params_are_valid = (f_low is not None) ^ (
             (lf_X is not None) and (lf_Y is not None) and (lf_hf_adapt_ratio is not None))
         assert lf_model_params_are_valid, 'define low-fidelity model either by mean function or by Data'
@@ -39,6 +43,7 @@ class DataAugmentationGP(AbstractGP):
             self.__update_input_borders(lf_X)
             self.lf_X = lf_X
             self.lf_Y = lf_Y
+
             self.lf_model = GPy.models.GPRegression(
                 X=lf_X, Y=lf_Y, initialize=True
             )
@@ -67,20 +72,26 @@ class DataAugmentationGP(AbstractGP):
         # do the same with low fidelity, with more steps (ration * numsteps) ration given in __init__
         for i in range(num_steps):
             acquired_x = self.get_input_with_highest_uncertainty(model=self)
+            self.acquired_X.append(acquired_x.copy())
+            # self.acquired_y.append(self.__f_high_real(acquired_x))
+            self.acquired_y.append(0)
             self.fit(np.append(self.hf_X, acquired_x))
 
     def __adapt_lf(self, num_steps):
         for i in range(num_steps):
-            acquired_x = self.get_input_with_highest_uncertainty(self.lf_model)
-            acquired_y = self.lf_model.predict(acquired_x.reshape(-1, 1))[0]
+            acquired_x = self.get_input_with_highest_uncertainty(model=self.lf_model).reshape(-1, 1)
+            acquired_y = self.lf_model.predict(acquired_x)[0].reshape(-1, 1)
 
-            self.lf_X = np.append(self.lf_X, acquired_x).reshape(-1, 1)
-            self.lf_Y = np.append(self.lf_Y, acquired_y).reshape(-1, 1)
+            self.lf_X = np.append(self.lf_X, acquired_x, axis=0)
+            self.lf_Y = np.append(self.lf_Y, acquired_y, axis=0)
 
             self.lf_model = GPy.models.GPRegression(
                 X=self.lf_X, Y=self.lf_Y, initialize=True
             )
-            self.lf_model.optimize()
+            if i == num_steps - 1:
+                self.lf_model.optimize()
+                self.lf_model.plot()
+            plt.show()
 
     def predict(self, X_test):
         assert X_test.ndim == 2
@@ -143,6 +154,9 @@ class DataAugmentationGP(AbstractGP):
                              y2=pred_mean + confidence_inteval_width * pred_variance,
                              color=(0, 1, 0, .75)
                              )
+
+        if self.acquired_X:
+            plt.plot(self.acquired_X, self.acquired_y, 'yo')
 
         plt.legend()
         plt.show()
