@@ -10,7 +10,7 @@ from sklearn.metrics import mean_squared_error
 
 class DataAugmentationGP(AbstractGP):
 
-    def __init__(self, tau: float, n: int, input_dim: int, f_high: callable, f_low: callable = None, lf_X: np.ndarray = None, lf_Y: np.ndarray = None, step_count: int = 0):
+    def __init__(self, tau: float, n: int, input_dim: int, f_high: callable, adapt_steps: int = 0, f_low: callable = None, lf_X: np.ndarray = None, lf_Y: np.ndarray = None, lf_hf_adapt_ratio: int = 1,):
         '''
         input: tau
             distance to neighbour points used in taylor expansion
@@ -31,21 +31,25 @@ class DataAugmentationGP(AbstractGP):
         self.a = self.b = None
 
         lf_model_params_are_valid = (f_low is not None) ^ (
-            (lf_X is not None) and (lf_Y is not None))
+            (lf_X is not None) and (lf_Y is not None) and (lf_hf_adapt_ratio is not None))
         assert lf_model_params_are_valid, 'define low-fidelity model either by mean function or by Data'
 
         self.data_driven_lf_approach = f_low is None
         if self.data_driven_lf_approach:
-            self.lf_X, self.lf_Y = lf_X, lf_Y
+            self.__update_input_borders(lf_X)
+            self.lf_X = lf_X
+            self.lf_Y = lf_Y
             self.lf_model = GPy.models.GPRegression(
                 X=lf_X, Y=lf_Y, initialize=True
             )
             self.lf_model.optimize()
+            self.__adapt_lf(adapt_steps * lf_hf_adapt_ratio)
             self.__lf_mean_predict = lambda t: self.lf_model.predict(t)[0]
         else:
             self.__lf_mean_predict = f_low
 
     def fit(self, hf_X):
+        self.__update_input_borders(hf_X)
         hf_X = hf_X.reshape(-1, 1)
         # high fidelity data is as precise as ground truth data
         self.hf_X, self.hf_Y = hf_X, self.__f_high_real(hf_X)
@@ -59,13 +63,24 @@ class DataAugmentationGP(AbstractGP):
         )
         self.hf_model.optimize()  # ARD
 
-    def adapt_hf(self, num_steps):
+    def adapt(self, num_steps):
         # do the same with low fidelity, with more steps (ration * numsteps) ration given in __init__
-        assert self.hf_model is not None
         for i in range(num_steps):
-            # find x with highest variance
-            acquired_x = self.get_x_with_highest_uncertainty()
+            acquired_x = self.get_input_with_highest_uncertainty(model=self)
             self.fit(np.append(self.hf_X, acquired_x))
+
+    def __adapt_lf(self, num_steps):
+        for i in range(num_steps):
+            acquired_x = self.get_input_with_highest_uncertainty(self.lf_model)
+            acquired_y = self.lf_model.predict(acquired_x.reshape(-1, 1))[0]
+
+            self.lf_X = np.append(self.lf_X, acquired_x).reshape(-1, 1)
+            self.lf_Y = np.append(self.lf_Y, acquired_y).reshape(-1, 1)
+
+            self.lf_model = GPy.models.GPRegression(
+                X=self.lf_X, Y=self.lf_Y, initialize=True
+            )
+            self.lf_model.optimize()
 
     def predict(self, X_test):
         assert X_test.ndim == 2
@@ -81,7 +96,6 @@ class DataAugmentationGP(AbstractGP):
 
     def plot(self):
         assert self.input_dim == 1, '2d plots need one-dimensional data'
-        assert self.f_high is not None, 'model is not fitted yet'
         self.__plot()
 
     def plot_forecast(self, forecast_range=.5):
@@ -94,16 +108,15 @@ class DataAugmentationGP(AbstractGP):
         return mse
 
     def __plot(self, confidence_inteval_width=2, plot_lf=True, plot_hf=True, plot_pred=True, exceed_range_by=0):
-        self.a, self.b = np.min(self.hf_X), np.max(self.hf_X)
         point_density = 500
         X = np.linspace(self.a, self.b * (1 + exceed_range_by),
-                        int(point_density * (1 + exceed_range_by)))
+                        int(point_density * (1 + exceed_range_by))).reshape(-1, 1)
         pred_mean, pred_variance = self.predict(X.reshape(-1, 1))
         pred_mean = pred_mean.flatten()
         pred_variance = pred_variance.flatten()
 
         if (not self.data_driven_lf_approach):
-            self.lf_X = np.linspace(self.a, self.b, 50)
+            self.lf_X = np.linspace(self.a, self.b, 50).reshape(-1, 1)
             self.lf_Y = self.__lf_mean_predict(self.lf_X)
 
         lf_color, hf_color, pred_color = 'r', 'b', 'g'
@@ -125,7 +138,7 @@ class DataAugmentationGP(AbstractGP):
         if plot_pred:
             # plot prediction
             plt.plot(X, pred_mean, pred_color, label='prediction')
-            plt.fill_between(X,
+            plt.fill_between(X.flatten(),
                              y1=pred_mean - confidence_inteval_width * pred_variance,
                              y2=pred_mean + confidence_inteval_width * pred_variance,
                              color=(0, 1, 0, .75)
@@ -142,15 +155,23 @@ class DataAugmentationGP(AbstractGP):
         ], axis=1)
         return np.concatenate([X, new_entries], axis=1)
 
-    def get_x_with_highest_uncertainty(self, precision: int = 200):
-        if self.a is None:
-            self.a = np.min(self.hf_X)
-        if self.b is None:
-            self.b = np.max(self.hf_X)
+    def get_input_with_highest_uncertainty(self, model, precision: int = 200):
         X = np.linspace(self.a, self.b, precision).reshape(-1, 1)
-        uncertainties = self.predict_variance(X)
+        uncertainties = model.predict(X)[1]
+        # plt.plot(X, uncertainties)
+        # plt.show()
         index_with_highest_uncertainty = np.argmax(uncertainties)
         return X[index_with_highest_uncertainty]
+
+    def __update_input_borders(self, X: np.ndarray):
+        if self.a == None and self.b == None:
+            self.a = np.min(X)
+            self.b = np.max(X)
+        else:
+            if np.min(X) < self.a:
+                self.a = np.min(X)
+            if self.b < np.max(X):
+                self.b = np.max(X)
 
 #   GP_augmented_data, select better kernel than RBF
 #   NARGP

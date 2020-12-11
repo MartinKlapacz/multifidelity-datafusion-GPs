@@ -8,13 +8,12 @@ if __name__ == "__main__":
 
     # create, train, test model
     model = DataAugmentationGP(
-        tau=.001, n=0, input_dim=1, f_high=f_high, f_low=f_low
+        tau=.001, n=0, input_dim=1, f_high=f_high, lf_X=X_train_lf, lf_Y=y_train_lf, adapt_steps=5, lf_hf_adapt_ratio=1
+        # tau=.001, n=0, input_dim=1, f_high=f_high, f_low=f_low
     )
 
     model.fit(hf_X=X_train_hf)
 
-    model.assess_mse(X_test=X_test, y_test=y_test)
+    model.adapt(5)
 
-    model.adapt_hf(5)
-
-    model.assess_mse(X_test=X_test, y_test=y_test)
+    model.plot_forecast(5)
