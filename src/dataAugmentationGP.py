@@ -29,16 +29,16 @@ class DataAugmentationGP(AbstractGP):
         self.input_dim = input_dim
         self.__f_high_real = f_high
         self.f_low = f_low
+        self.adapt_steps = adapt_steps
+        self.lf_hf_adapt_ratio = lf_hf_adapt_ratio
         self.a = self.b = None
-
-        self.acquired_X = []
-        self.acquired_y = []
 
         lf_model_params_are_valid = (f_low is not None) ^ (
             (lf_X is not None) and (lf_Y is not None) and (lf_hf_adapt_ratio is not None))
         assert lf_model_params_are_valid, 'define low-fidelity model either by mean function or by Data'
 
         self.data_driven_lf_approach = f_low is None
+
         if self.data_driven_lf_approach:
             self.__update_input_borders(lf_X)
             self.lf_X = lf_X
@@ -48,18 +48,18 @@ class DataAugmentationGP(AbstractGP):
                 X=lf_X, Y=lf_Y, initialize=True
             )
             self.lf_model.optimize()
-            self.__adapt_lf(adapt_steps * lf_hf_adapt_ratio)
+            self.__adapt_lf()
             self.__lf_mean_predict = lambda t: self.lf_model.predict(t)[0]
         else:
             self.__lf_mean_predict = f_low
 
     def fit(self, hf_X):
         self.__update_input_borders(hf_X)
-        hf_X = hf_X.reshape(-1, 1)
+        self.hf_X = hf_X.reshape(-1, 1)
         # high fidelity data is as precise as ground truth data
-        self.hf_X, self.hf_Y = hf_X, self.__f_high_real(hf_X)
+        self.hf_Y = self.__f_high_real(self.hf_X)
         # augment input data before prediction
-        augmented_hf_X = self.__augment_Data(hf_X)
+        augmented_hf_X = self.__augment_Data(self.hf_X)
 
         kernel = NARGPKernel(input_dim=augmented_hf_X.shape[1], n=self.n)
 
@@ -68,30 +68,38 @@ class DataAugmentationGP(AbstractGP):
         )
         self.hf_model.optimize()  # ARD
 
-    def adapt(self, num_steps):
+    def adapt(self):
         # do the same with low fidelity, with more steps (ration * numsteps) ration given in __init__
-        for i in range(num_steps):
-            acquired_x = self.get_input_with_highest_uncertainty(model=self)
-            self.acquired_X.append(acquired_x.copy())
-            # self.acquired_y.append(self.__f_high_real(acquired_x))
-            self.acquired_y.append(0)
+        for i in range(self.adapt_steps):
+            acquired_x = self.get_input_with_highest_uncertainty()
             self.fit(np.append(self.hf_X, acquired_x))
 
-    def __adapt_lf(self, num_steps):
-        for i in range(num_steps):
-            acquired_x = self.get_input_with_highest_uncertainty(model=self.lf_model).reshape(-1, 1)
-            acquired_y = self.lf_model.predict(acquired_x)[0].reshape(-1, 1)
+    def get_input_with_highest_uncertainty(self, precision: int = 200):
+        X = np.linspace(self.a, self.b, precision).reshape(-1, 1)
+        uncertainties = self.predict(X)[1]
+        # plt.plot(X, uncertainties)
+        # plt.show()
+        index_with_highest_uncertainty = np.argmax(uncertainties)
+        return X[index_with_highest_uncertainty]
 
-            self.lf_X = np.append(self.lf_X, acquired_x, axis=0)
-            self.lf_Y = np.append(self.lf_Y, acquired_y, axis=0)
+    def __adapt_lf(self):
+        X = np.linspace(self.a, self.b, 100).reshape(-1, 1)
+        for i in range(self.adapt_steps * self.lf_hf_adapt_ratio):
+            uncertainties = self.lf_model.predict(X)[1]
+            maxIndex = np.argmax(uncertainties)
+            new_x = X[maxIndex].reshape(-1, 1)
+            new_y = self.lf_model.predict(new_x)[0]
+
+            self.lf_X = np.append(self.lf_X, new_x, axis=0)
+            self.lf_Y = np.append(self.lf_Y, new_y, axis=0)
 
             self.lf_model = GPy.models.GPRegression(
-                X=self.lf_X, Y=self.lf_Y, initialize=True
+                self.lf_X, self.lf_Y, initialize=True
             )
-            if i == num_steps - 1:
-                self.lf_model.optimize()
-                self.lf_model.plot()
-            plt.show()
+            self.lf_model.optimize_restarts(
+                num_restarts=5,
+                optimizer='tnc'
+            )
 
     def predict(self, X_test):
         assert X_test.ndim == 2
@@ -155,9 +163,6 @@ class DataAugmentationGP(AbstractGP):
                              color=(0, 1, 0, .75)
                              )
 
-        if self.acquired_X:
-            plt.plot(self.acquired_X, self.acquired_y, 'yo')
-
         plt.legend()
         plt.show()
 
@@ -168,14 +173,6 @@ class DataAugmentationGP(AbstractGP):
             self.__lf_mean_predict(X + i * self.tau) for i in augmentIter(self.n)
         ], axis=1)
         return np.concatenate([X, new_entries], axis=1)
-
-    def get_input_with_highest_uncertainty(self, model, precision: int = 200):
-        X = np.linspace(self.a, self.b, precision).reshape(-1, 1)
-        uncertainties = model.predict(X)[1]
-        # plt.plot(X, uncertainties)
-        # plt.show()
-        index_with_highest_uncertainty = np.argmax(uncertainties)
-        return X[index_with_highest_uncertainty]
 
     def __update_input_borders(self, X: np.ndarray):
         if self.a == None and self.b == None:
