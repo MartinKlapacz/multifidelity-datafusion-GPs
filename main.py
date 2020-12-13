@@ -1,17 +1,27 @@
 import numpy as np
-from dataAugmentationGP import DataAugmentationGP
-from sklearn.metrics import mean_squared_error
-from datasets import get_example_data
+from src import get_example_data1, get_example_data2, get_example_data3, get_example_data4
+from src import DataAugmentationGP
+import GPy
+import matplotlib.pyplot as plt
 
 
 if __name__ == "__main__":
-    X_train_hf, X_train_lf, y_train_hf, y_train_lf, X_test, y_test = get_example_data()
-    def f_low(t): return np.sin(8 * np.pi * t)
+    X_train_hf, X_train_lf, y_train_lf, f_high, f_low, X_test, y_test = get_example_data4()
 
     # create, train, test model
-    model = DataAugmentationGP(tau=.001, n=4, input_dims=1, f_low=f_low)
-    model.fit(hf_X=X_train_hf, hf_Y=y_train_hf)
-    predictions = model.predict_means(X_test)
-    mse = mean_squared_error(y_true=y_test, y_pred=predictions)
-    print('mean squared error: {}'.format(mse))
+    model = DataAugmentationGP(
+        # data driven
+        input_dim=1, tau=.001, n=1, f_high=f_high, adapt_steps=5, lf_X=X_train_lf, lf_Y=y_train_lf, lf_hf_adapt_ratio=1
+        # function driven
+        # input_dim=1, tau=.001, n=1, f_high=f_high, adapt_steps=5, f_low=f_low
+    )
+
+    model.fit(hf_X=X_train_hf)
+
+    model.assess_mse(X_test, y_test)
+
+    model.adapt()
+
+    model.assess_mse(X_test, y_test)
+
     model.plot()
