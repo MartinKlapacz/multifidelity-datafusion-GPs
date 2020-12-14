@@ -60,7 +60,7 @@ class NARGPKernel(Kern):
     def plot(self, ):
         self.kernel.plot()
 
-    def update_gradients_full(self, dL_dK, X, X2=None):
+    def update_gradients_full(self, dL_dK, X, X2=None): 
         # todo: correct implementation
         self.kern1.update_gradients_full(dL_dK, X, X2)
         self.kern2.update_gradients_full(dL_dK, X, X2)
