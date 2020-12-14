@@ -64,7 +64,7 @@ class DataAugmentationGP(AbstractGP):
         kernel = NARGPKernel(input_dim=augmented_hf_X.shape[1], n=self.n)
 
         self.hf_model = GPy.models.GPRegression(
-            X=augmented_hf_X, Y=self.hf_Y, kernel=None, initialize=True
+            X=augmented_hf_X, Y=self.hf_Y, kernel=kernel, initialize=True
         )
         self.hf_model.optimize()  # ARD
 
@@ -75,10 +75,12 @@ class DataAugmentationGP(AbstractGP):
             self.fit(np.append(self.hf_X, acquired_x))
 
     def get_input_with_highest_uncertainty(self, precision: int = 200):
-        X = np.linspace(self.a, self.b, precision).reshape(-1, 1)
+        X = np.linspace(0, 1, precision).reshape(-1, 1)
         uncertainties = self.predict(X)[1]
         # plt.plot(X, uncertainties)
         # plt.show()
+        # self.plot_forecast(1)
+        # self.__plot(plot_lf=False)
         index_with_highest_uncertainty = np.argmax(uncertainties)
         return X[index_with_highest_uncertainty]
 
@@ -164,7 +166,6 @@ class DataAugmentationGP(AbstractGP):
                              )
 
         plt.legend()
-        plt.show()
 
     def __augment_Data(self, X):
         assert isinstance(X, np.ndarray), 'input must be an array'

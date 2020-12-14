@@ -17,11 +17,24 @@ class NARGPKernel(Kern):
         self.kern2 = kernClass2(len(augm_entries),active_dims=augm_entries, ARD=True)
         self.kern3 = kernClass3(len(standard_entries), active_dims=standard_entries, ARD=True)
 
-        self.kernel = self.kern3 * self.kern2 + self.kern3
+        self.kernel = self.kern1 * self.kern2 + self.kern3
 
-        self.variance = Param('variance', self.kernel)
-        self.lengthscale = Param('lengtscale', self.kernel)
-        # self.add_parameters(self.variance, self.lengthscale)
+        self.variance1 = Param('variance1', self.kern1.variance)
+        # self.variance2 = Param('variance2', self.kern2.variance)
+        self.variance3 = Param('variance3', self.kern3.variance)
+
+        self.lengthscale1 = Param('lengthscale1', self.kern1.lengthscale)
+        self.lengthscale2 = Param('lengthscale2', self.kern2.lengthscale)
+        self.lengthscale3 = Param('lengthscale3', self.kern3.lengthscale)
+
+        self.link_parameters(
+            self.variance1,
+            # self.variance2,
+            self.variance3,
+            self.lengthscale1,
+            self.lengthscale2,
+            self.lengthscale3,
+        )
 
     def __str__(self):
         return self.kernel.__str__()
