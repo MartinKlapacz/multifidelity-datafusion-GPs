@@ -23,9 +23,9 @@ class NARGPKernel(Kern):
         self.variance2 = Param('variance2', self.kern2.variance)
         self.variance3 = Param('variance3', self.kern3.variance)
 
-        self.lengthscale1 = Param('variance1', self.kern1.lengthscale)
-        self.lengthscale2 = Param('variance2', self.kern2.lengthscale)
-        self.lengthscale3 = Param('variance3', self.kern3.lengthscale)
+        self.lengthscale1 = Param('lengthscale1', self.kern1.lengthscale)
+        self.lengthscale2 = Param('lengthscale2', self.kern2.lengthscale)
+        self.lengthscale3 = Param('lengthscale3', self.kern3.lengthscale)
 
         self.link_parameters(
             self.variance1,
@@ -65,5 +65,3 @@ class NARGPKernel(Kern):
         self.kern1.update_gradients_full(dL_dK, X, X2)
         self.kern2.update_gradients_full(dL_dK, X, X2)
         self.kern3.update_gradients_full(dL_dK, X, X2)
-
-kernel = NARGPKernel(2, 0)
