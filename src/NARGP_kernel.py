@@ -19,9 +19,22 @@ class NARGPKernel(Kern):
 
         self.kernel = self.kern3 * self.kern2 + self.kern3
 
-        self.variance = Param('variance', self.kernel)
-        self.lengthscale = Param('lengtscale', self.kernel)
-        # self.add_parameters(self.variance, self.lengthscale)
+        self.variance1 = Param('variance1', self.kern1.variance)
+        self.variance2 = Param('variance2', self.kern2.variance)
+        self.variance3 = Param('variance3', self.kern3.variance)
+
+        self.lengthscale1 = Param('variance1', self.kern1.lengthscale)
+        self.lengthscale2 = Param('variance2', self.kern2.lengthscale)
+        self.lengthscale3 = Param('variance3', self.kern3.lengthscale)
+
+        self.link_parameters(
+            self.variance1,
+            self.variance2,
+            self.variance3,
+            self.lengthscale1,
+            self.lengthscale2,
+            self.lengthscale3,
+        )
 
     def __str__(self):
         return self.kernel.__str__()
@@ -47,8 +60,10 @@ class NARGPKernel(Kern):
     def plot(self, ):
         self.kernel.plot()
 
-    def update_gradients_full(self, dL_dK, X, X2=None):
+    def update_gradients_full(self, dL_dK, X, X2=None): 
         # todo: correct implementation
         self.kern1.update_gradients_full(dL_dK, X, X2)
         self.kern2.update_gradients_full(dL_dK, X, X2)
         self.kern3.update_gradients_full(dL_dK, X, X2)
+
+kernel = NARGPKernel(2, 0)

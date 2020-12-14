@@ -64,7 +64,7 @@ class DataAugmentationGP(AbstractGP):
         kernel = NARGPKernel(input_dim=augmented_hf_X.shape[1], n=self.n)
 
         self.hf_model = GPy.models.GPRegression(
-            X=augmented_hf_X, Y=self.hf_Y, kernel=None, initialize=True
+            X=augmented_hf_X, Y=self.hf_Y, kernel=kernel, initialize=True
         )
         self.hf_model.optimize()  # ARD
 
