@@ -64,7 +64,7 @@ class DataAugmentationGP(AbstractGP):
         kernel = NARGPKernel(input_dim=augmented_hf_X.shape[1], n=self.n)
 
         self.hf_model = GPy.models.GPRegression(
-            X=augmented_hf_X, Y=self.hf_Y, kernel=kernel, initialize=True
+            X=augmented_hf_X, Y=self.hf_Y, kernel=None, initialize=True
         )
         self.hf_model.optimize()  # ARD
 
@@ -122,11 +122,12 @@ class DataAugmentationGP(AbstractGP):
     def plot_forecast(self, forecast_range=.5):
         self.__plot(exceed_range_by=forecast_range)
 
-    def assess_mse(self, X_test, y_test):
+    def assess_log_mse(self, X_test, y_test):
         predictions = self.predict_means(X_test)
         mse = mean_squared_error(y_true=y_test, y_pred=predictions)
-        print('mean squared error: {}'.format(mse))
-        return mse
+        log_mse = np.log2(mse)
+        print('log mean squared error: {}'.format(log_mse))
+        return log_mse
 
     def __plot(self, confidence_inteval_width=2, plot_lf=True, plot_hf=True, plot_pred=True, exceed_range_by=0):
         point_density = 500
