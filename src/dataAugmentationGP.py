@@ -3,7 +3,6 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 from src.abstractGP import AbstractGP
-from src.NARGP_kernel import NARGPKernel
 from src.augmentationIterators import augmentIter
 from sklearn.metrics import mean_squared_error
 from time import sleep
@@ -61,10 +60,11 @@ class DataAugmentationGP(AbstractGP):
         # augment input data before prediction
         augmented_hf_X = self.__augment_Data(self.hf_X)
 
-        kernel = NARGPKernel(input_dim=augmented_hf_X.shape[1], n=self.n)
-
         self.hf_model = GPy.models.GPRegression(
-            X=augmented_hf_X, Y=self.hf_Y, kernel=None, initialize=True
+            X=augmented_hf_X, 
+            Y=self.hf_Y, 
+            kernel=self.NARGP_kernel(), 
+            initialize=True
         )
         self.hf_model.optimize()  # ARD
 
@@ -75,12 +75,10 @@ class DataAugmentationGP(AbstractGP):
             self.fit(np.append(self.hf_X, acquired_x))
 
     def get_input_with_highest_uncertainty(self, precision: int = 200):
-        X = np.linspace(0, 1, precision).reshape(-1, 1)
+        X = np.linspace(self.a, self.b, precision).reshape(-1, 1)
         uncertainties = self.predict(X)[1]
         # plt.plot(X, uncertainties)
         # plt.show()
-        # self.plot_forecast(1)
-        # self.__plot(plot_lf=False)
         index_with_highest_uncertainty = np.argmax(uncertainties)
         return X[index_with_highest_uncertainty]
 
@@ -128,6 +126,18 @@ class DataAugmentationGP(AbstractGP):
         log_mse = np.log2(mse)
         print('log mean squared error: {}'.format(log_mse))
         return log_mse
+
+    def NARGP_kernel(self):
+        std_input_dim = self.input_dim
+        std_indezes = np.arange(self.input_dim)
+
+        aug_input_dim = 2 * self.n + 1
+        aug_indezes = np.arange(self.input_dim, self.input_dim + aug_input_dim)
+
+        kern1 = GPy.kern.RBF(aug_input_dim, active_dims=aug_indezes)
+        kern2 = GPy.kern.RBF(std_input_dim, active_dims=std_indezes)
+        kern3 = GPy.kern.RBF(std_input_dim, active_dims=std_indezes)
+        return kern1 * kern2 + kern3
 
     def __plot(self, confidence_inteval_width=2, plot_lf=True, plot_hf=True, plot_pred=True, exceed_range_by=0):
         point_density = 500
