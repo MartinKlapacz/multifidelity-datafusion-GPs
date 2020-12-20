@@ -66,10 +66,11 @@ class DataAugmentationGP(AbstractGP):
             kernel=self.NARGP_kernel(),
             initialize=True
         )
-        self.hf_model.optimize_restarts(num_restarts=4, verbose=False)  # ARD
+        self.hf_model.optimize_restarts(num_restarts=6, verbose=False)  # ARD
 
     def adapt(self, plot=False, X_test=None, Y_test=None, verbose=False):
         if plot:
+            # prepare subplotting
             subplots_per_row = int(np.ceil(np.sqrt(self.adapt_steps)))
             subplots_per_column = int(np.ceil(self.adapt_steps / subplots_per_row))
             fig, axs = plt.subplots(
@@ -88,6 +89,7 @@ class DataAugmentationGP(AbstractGP):
             if verbose:
                 print('new x acquired: {}'.format(acquired_x))
             if plot:
+                # add subplott in 
                 _, uncertainties = self.predict(X)
                 ax = axs.flatten()[i]
                 ax.axes.xaxis.set_visible(False)
@@ -98,6 +100,7 @@ class DataAugmentationGP(AbstractGP):
                 ax.plot(acquired_x.reshape(-1, 1), 0, 'rx')
 
             self.fit(np.append(self.hf_X, acquired_x))
+            # self.fit(self.hf_X)
         
         plt2 = plt.figure(2)
         plt.title('logarithmic mean square error')
