@@ -20,10 +20,8 @@ if __name__ == "__main__":
 
     model.assess_log_mse(X_test, y_test)
 
-    model.adapt()
+    model.adapt(plot=True, X_test=X_test, Y_test=y_test)
 
     model.assess_log_mse(X_test, y_test)
-
-    model.plot_forecast(5)
 
     plt.show()

@@ -61,22 +61,40 @@ class DataAugmentationGP(AbstractGP):
         augmented_hf_X = self.__augment_Data(self.hf_X)
 
         self.hf_model = GPy.models.GPRegression(
-            X=augmented_hf_X, 
-            Y=self.hf_Y, 
-            kernel=self.NARGP_kernel(), 
+            X=augmented_hf_X,
+            Y=self.hf_Y,
+            kernel=self.NARGP_kernel(),
             initialize=True
         )
-        self.hf_model.optimize()  # ARD
+        self.hf_model.optimize_restarts(num_restarts=4, verbose=False)  # ARD
 
-    def adapt(self):
-        # do the same with low fidelity, with more steps (ration * numsteps) ration given in __init__
+    def adapt(self, plot=False, X_test=None, Y_test=None):
+        if plot:
+            subplot_n = int(np.ceil(np.sqrt(self.adapt_steps)))
+            fig, axs = plt.subplots(
+                subplot_n, subplot_n, 
+                sharey='row', 
+                sharex=True,
+                figsize=(20, 10))
+            fig.suptitle(
+                'Uncertainty development during the adaptation process')
+            X = np.linspace(self.a, self.b, 200).reshape(-1, 1)
+
         for i in range(self.adapt_steps):
             acquired_x = self.get_input_with_highest_uncertainty()
+            if plot:
+                _, uncertainties = self.predict(X)
+                ax = axs.flatten()[i]
+                ax.axes.xaxis.set_visible(False)
+                log_mse = self.assess_log_mse(X_test, Y_test)
+                ax.set_title('log mse: {}'.format(np.round(log_mse, 4)))
+                ax.plot(X, uncertainties)
+
             self.fit(np.append(self.hf_X, acquired_x))
 
     def get_input_with_highest_uncertainty(self, precision: int = 200):
         X = np.linspace(self.a, self.b, precision).reshape(-1, 1)
-        uncertainties = self.predict(X)[1]
+        _, uncertainties = self.predict(X)
         # plt.plot(X, uncertainties)
         # plt.show()
         index_with_highest_uncertainty = np.argmax(uncertainties)
@@ -108,10 +126,12 @@ class DataAugmentationGP(AbstractGP):
         return self.hf_model.predict(X_test)
 
     def predict_means(self, X_test):
-        return self.predict(X_test)[0]
+        means, _ = self.predict(X_test)
+        return means
 
     def predict_variance(self, X_test):
-        return self.predict(X_test)[1]
+        _, uncertainties = self.predict(X_test)
+        return uncertainties
 
     def plot(self):
         assert self.input_dim == 1, '2d plots need one-dimensional data'
@@ -124,19 +144,18 @@ class DataAugmentationGP(AbstractGP):
         predictions = self.predict_means(X_test)
         mse = mean_squared_error(y_true=y_test, y_pred=predictions)
         log_mse = np.log2(mse)
-        print('log mean squared error: {}'.format(log_mse))
         return log_mse
 
-    def NARGP_kernel(self):
+    def NARGP_kernel(self, kern_class1=GPy.kern.RBF, kern_class2=GPy.kern.RBF, kern_class3=GPy.kern.RBF):
         std_input_dim = self.input_dim
         std_indezes = np.arange(self.input_dim)
 
         aug_input_dim = 2 * self.n + 1
         aug_indezes = np.arange(self.input_dim, self.input_dim + aug_input_dim)
 
-        kern1 = GPy.kern.RBF(aug_input_dim, active_dims=aug_indezes)
-        kern2 = GPy.kern.RBF(std_input_dim, active_dims=std_indezes)
-        kern3 = GPy.kern.RBF(std_input_dim, active_dims=std_indezes)
+        kern1 = kern_class1(aug_input_dim, active_dims=aug_indezes)
+        kern2 = kern_class2(std_input_dim, active_dims=std_indezes)
+        kern3 = kern_class3(std_input_dim, active_dims=std_indezes)
         return kern1 * kern2 + kern3
 
     def __plot(self, confidence_inteval_width=2, plot_lf=True, plot_hf=True, plot_pred=True, exceed_range_by=0):
