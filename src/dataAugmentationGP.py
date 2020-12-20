@@ -68,29 +68,42 @@ class DataAugmentationGP(AbstractGP):
         )
         self.hf_model.optimize_restarts(num_restarts=4, verbose=False)  # ARD
 
-    def adapt(self, plot=False, X_test=None, Y_test=None):
+    def adapt(self, plot=False, X_test=None, Y_test=None, verbose=False):
         if plot:
-            subplot_n = int(np.ceil(np.sqrt(self.adapt_steps)))
+            subplots_per_row = int(np.ceil(np.sqrt(self.adapt_steps)))
+            subplots_per_column = int(np.ceil(self.adapt_steps / subplots_per_row))
             fig, axs = plt.subplots(
-                subplot_n, subplot_n, 
-                sharey='row', 
+                subplots_per_row, 
+                subplots_per_column,
+                sharey='row',
                 sharex=True,
                 figsize=(20, 10))
             fig.suptitle(
                 'Uncertainty development during the adaptation process')
             X = np.linspace(self.a, self.b, 200).reshape(-1, 1)
+            log_mses = []
 
         for i in range(self.adapt_steps):
             acquired_x = self.get_input_with_highest_uncertainty()
+            if verbose:
+                print('new x acquired: {}'.format(acquired_x))
             if plot:
                 _, uncertainties = self.predict(X)
                 ax = axs.flatten()[i]
                 ax.axes.xaxis.set_visible(False)
                 log_mse = self.assess_log_mse(X_test, Y_test)
+                log_mses.append(log_mse)
                 ax.set_title('log mse: {}'.format(np.round(log_mse, 4)))
                 ax.plot(X, uncertainties)
+                ax.plot(acquired_x.reshape(-1, 1), 0, 'rx')
 
             self.fit(np.append(self.hf_X, acquired_x))
+        
+        plt2 = plt.figure(2)
+        plt.title('logarithmic mean square error')
+        plt.xlabel('adapt step')
+        plt.ylabel('log mse')
+        plt.plot(np.arange(self.adapt_steps), np.array(log_mses))
 
     def get_input_with_highest_uncertainty(self, precision: int = 200):
         X = np.linspace(self.a, self.b, precision).reshape(-1, 1)
