@@ -101,12 +101,12 @@ class DataAugmentationGP(AbstractGP):
 
             self.fit(np.append(self.hf_X, acquired_x))
             # self.fit(self.hf_X)
-        
-        plt2 = plt.figure(2)
-        plt.title('logarithmic mean square error')
-        plt.xlabel('adapt step')
-        plt.ylabel('log mse')
-        plt.plot(np.arange(self.adapt_steps), np.array(log_mses))
+        if plot:
+            plt2 = plt.figure(2)
+            plt.title('logarithmic mean square error')
+            plt.xlabel('adapt step')
+            plt.ylabel('log mse')
+            plt.plot(np.arange(self.adapt_steps), np.array(log_mses))
 
     def get_input_with_highest_uncertainty(self, precision: int = 200):
         X = np.linspace(self.a, self.b, precision).reshape(-1, 1)
