@@ -3,7 +3,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 from src.abstractGP import AbstractGP
-from src.augmentationIterators import augmentIter
+from src.augmentationIterators import EvenAugmentation
 from sklearn.metrics import mean_squared_error
 from time import sleep
 
@@ -31,6 +31,7 @@ class DataAugmentationGP(AbstractGP):
         self.adapt_steps = adapt_steps
         self.lf_hf_adapt_ratio = lf_hf_adapt_ratio
         self.a = self.b = None
+        self.augm_iterator = EvenAugmentation(self.n)
 
         lf_model_params_are_valid = (f_low is not None) ^ (
             (lf_X is not None) and (lf_Y is not None) and (lf_hf_adapt_ratio is not None))
@@ -70,6 +71,7 @@ class DataAugmentationGP(AbstractGP):
 
     def adapt(self, plot=False, X_test=None, Y_test=None, verbose=False):
         if plot:
+            assert self.input_dim == 1
             # prepare subplotting
             subplots_per_row = int(np.ceil(np.sqrt(self.adapt_steps)))
             subplots_per_column = int(np.ceil(self.adapt_steps / subplots_per_row))
@@ -166,7 +168,7 @@ class DataAugmentationGP(AbstractGP):
         std_input_dim = self.input_dim
         std_indezes = np.arange(self.input_dim)
 
-        aug_input_dim = 2 * self.n + 1
+        aug_input_dim = self.augm_iterator.numOfNewAugmentationEntries()
         aug_indezes = np.arange(self.input_dim, self.input_dim + aug_input_dim)
 
         kern1 = kern_class1(aug_input_dim, active_dims=aug_indezes)
@@ -217,7 +219,7 @@ class DataAugmentationGP(AbstractGP):
         assert isinstance(X, np.ndarray), 'input must be an array'
         assert len(X) > 0, 'input must be non-empty'
         new_entries = np.concatenate([
-            self.__lf_mean_predict(X + i * self.tau) for i in augmentIter(self.n)
+            self.__lf_mean_predict(X + i * self.tau) for i in self.augm_iterator
         ], axis=1)
         return np.concatenate([X, new_entries], axis=1)
 
