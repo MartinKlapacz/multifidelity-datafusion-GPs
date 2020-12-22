@@ -3,7 +3,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 from src.abstractGP import AbstractGP
-from src.augmentationIterators import EvenAugmentation
+from src.augmentationIterators import EvenAugmentation, BackwardAugmentation
 from sklearn.metrics import mean_squared_error
 from time import sleep
 

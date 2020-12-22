@@ -1,11 +1,28 @@
-class EvenAugmentation():
+import abc
+
+class AbstractAugmIterator(metaclass=abc.ABCMeta):
+    def __iter__(self):
+        return self
+
+    @abc.abstractmethod
+    def __next__(self):
+        pass
+
+    @abc.abstractmethod
+    def numOfNewAugmentationEntries(self):
+        pass
+
+    @abc.abstractmethod
+    def reset(self):
+        pass
+
+
+
+class EvenAugmentation(AbstractAugmIterator):
     # generates a number sequence 0, 1, -1, 2, -2, ..., n, -n
     def __init__(self, n):
         self.reset()
         self.n = n
-
-    def __iter__(self):
-        return self
 
     def __next__(self):
         if self.i == 0:
@@ -19,7 +36,7 @@ class EvenAugmentation():
             self.sign = 1
             self.i += 1
             return -val
-        self.reset() # make same iterator object reuseable
+        self.reset()
         raise StopIteration
 
     def numOfNewAugmentationEntries(self):
@@ -28,3 +45,23 @@ class EvenAugmentation():
     def reset(self):
         self.i = 0
         self.sign = 1
+
+
+class BackwardAugmentation(AbstractAugmIterator):
+    # generates a number sequence 0, -1, -2, ..., -n
+    def __init__(self, n):
+        self.reset()
+        self.n = n
+
+    def __next__(self):
+        if self.i <= self.n:
+            self.i += 1
+            return -self.i + 1
+        self.reset()
+        raise StopIteration
+
+    def numOfNewAugmentationEntries(self):
+        return self.n + 1
+
+    def reset(self):
+        self.i = 0
