@@ -36,9 +36,14 @@ def get_example_data4():
     def f_high(t): return (t - 1.41) * f_low(t)**2
     return get_example_data(f_low, f_high)
 
+def get_example_data5():
+    def f_low(t): return np.sin(8 * pi * t)
+    def f_high(t): return t**2 +  np.sin(8 * pi * t + pi/10)
+    return get_example_data(f_low, f_high)
+
 
 def get_example_data(f_low, f_high):
-    hf_size = 20
+    hf_size = 5
     lf_size = 80
     N = lf_size + hf_size
 
