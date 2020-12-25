@@ -77,7 +77,7 @@ class DataAugmentationGP(AbstractGP):
         elif plot == False:
             self.__adapt_no_plot(verbose=verbose)
         else:
-            raise Exception('invalid plot mode')
+            raise Exception('invalid plot mode, use mean, uncertainty or False')
 
     def __adapt_plot_uncertainties(self, X_test=None, Y_test=None, verbose=False):
         X = np.linspace(self.a, self.b, 200).reshape(-1, 1)
@@ -105,7 +105,7 @@ class DataAugmentationGP(AbstractGP):
             ax.axes.xaxis.set_visible(False)
             log_mse = self.assess_log_mse(X_test, Y_test)
             log_mses.append(log_mse)
-            ax.set_title('log mse: {}'.format(np.round(log_mse, 4)))
+            ax.set_title('log mse: {}'.format(log_mse))
             ax.plot(X, uncertainties)
             ax.plot(acquired_x.reshape(-1, 1), 0, 'rx')
             self.fit(np.append(self.hf_X, acquired_x))
@@ -123,8 +123,9 @@ class DataAugmentationGP(AbstractGP):
             if verbose:
                 print('new x acquired: {}'.format(acquired_x))
             means, _ = self.predict(X)
-            plt.plot(X, means)
+            plt.plot(X, means, label='step {}'.format(i))
             self.fit(np.append(self.hf_X, acquired_x))
+        plt.legend()
 
     def __adapt_no_plot(self, verbose=False):
         X = np.linspace(self.a, self.b, 200).reshape(-1, 1)
@@ -184,7 +185,7 @@ class DataAugmentationGP(AbstractGP):
         predictions = self.predict_means(X_test)
         mse = mean_squared_error(y_true=y_test, y_pred=predictions)
         log_mse = np.log2(mse)
-        return log_mse
+        return np.round(log_mse, 4)
 
     def NARGP_kernel(self, kern_class1=GPy.kern.RBF, kern_class2=GPy.kern.RBF, kern_class3=GPy.kern.RBF):
         std_input_dim = self.input_dim
