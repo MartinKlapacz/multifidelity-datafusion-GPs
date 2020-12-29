@@ -1,5 +1,5 @@
 import numpy as np
-from src import get_example_data1, get_example_data2, get_example_data3, get_example_data4
+from src import get_example_data1, get_example_data2, get_example_data3, get_example_data4, get_example_data5
 from src import DataAugmentationGP
 import GPy
 import matplotlib.pyplot as plt
@@ -13,17 +13,16 @@ if __name__ == "__main__":
         # data driven
         # input_dim=1, tau=.001, n=1, f_high=f_high, adapt_steps=5, lf_X=X_train_lf, lf_Y=y_train_lf, lf_hf_adapt_ratio=1
         # function driven
-        input_dim=1, tau=.001, n=1, f_high=f_high, adapt_steps=5, f_low=f_low
+        input_dim=1, tau=.001, n=0, f_high=f_high, adapt_steps=15, f_low=f_low
     )
 
     model.fit(hf_X=X_train_hf)
 
-    model.assess_mse(X_test, y_test)
+    print("log mse: {}".format(model.assess_log_mse(X_test, y_test)))
 
-    model.adapt()
+    model.adapt(plot="mean", X_test=X_test, Y_test=y_test)
 
-    model.assess_mse(X_test, y_test)
+    print("log mse: {}".format(model.assess_log_mse(X_test, y_test)))
 
-    model.plot()
-
+    # model.plot_forecast(2)
     plt.show()
