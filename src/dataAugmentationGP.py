@@ -65,7 +65,7 @@ class DataAugmentationGP(AbstractGP):
         self.hf_model = GPy.models.GPRegression(
             X=augmented_hf_X,
             Y=self.hf_Y,
-            kernel=self.NARGP_kernel(),
+            kernel= None, # self.NARGP_kernel(),
             initialize=True
         )
         self.hf_model.optimize_restarts(num_restarts=6, verbose=False)  # ARD
@@ -86,6 +86,7 @@ class DataAugmentationGP(AbstractGP):
     def __adapt_plot_uncertainties(self, X_test=None, Y_test=None, verbose=False):
         X = np.linspace(self.a, self.b, 200).reshape(-1, 1)
         assert self.input_dim == 1
+        assert self.adapt_steps > 0
         # prepare subplotting
         subplots_per_row = int(np.ceil(np.sqrt(self.adapt_steps)))
         subplots_per_column = int(np.ceil(self.adapt_steps / subplots_per_row))
@@ -99,25 +100,32 @@ class DataAugmentationGP(AbstractGP):
             'Uncertainty development during the adaptation process')
         log_mses = []
 
+        axs_flat = axs.flatten()
         for i in range(self.adapt_steps):
             acquired_x = self.get_input_with_highest_uncertainty()
             if verbose:
                 print('new x acquired: {}'.format(acquired_x))
             _, uncertainties = self.predict(X)
-            ax = axs.flatten()[i]
+            ax = axs_flat[i]
             ax.axes.xaxis.set_visible(False)
             log_mse = self.assess_log_mse(X_test, Y_test)
             log_mses.append(log_mse)
-            ax.set_title('log mse: {}'.format(log_mse))
+            ax.set_title('log mse: {}, high-f. points: {}'.format(log_mse, len(self.hf_X)))
             ax.plot(X, uncertainties)
             ax.plot(acquired_x.reshape(-1, 1), 0, 'rx')
             self.fit(np.append(self.hf_X, acquired_x))
 
+        # plot log_mse development during adapt process
         plt.figure(2)
         plt.title('logarithmic mean square error')
-        plt.xlabel('adapt step')
+        plt.xlabel('hf points')
         plt.ylabel('log mse')
-        plt.plot(np.arange(self.adapt_steps), np.array(log_mses))
+        hf_X_len_before = len(self.hf_X) - self.adapt_steps
+        hf_X_len_now = len(self.hf_X)
+        plt.plot(
+            np.arange(hf_X_len_before, hf_X_len_now), 
+            np.array(log_mses)
+)
 
     def __adapt_plot_means(self, X_test=None, Y_test=None, verbose=False):
         X = np.linspace(self.a, self.b, 200).reshape(-1, 1)

@@ -1,5 +1,5 @@
 import numpy as np
-from src import get_example_data1, get_example_data2, get_example_data3, get_example_data4
+from src import get_example_data1, get_example_data2, get_example_data3, get_example_data4, get_example_data5
 from src import DataAugmentationGP
 import GPy
 import matplotlib.pyplot as plt
@@ -18,11 +18,11 @@ if __name__ == "__main__":
 
     model.fit(hf_X=X_train_hf)
 
-    print(model.assess_log_mse(X_test, y_test))
+    print("log mse: {}".format(model.assess_log_mse(X_test, y_test)))
 
-    model.adapt(plot='uncertainty', X_test=X_test, Y_test=y_test)
+    model.adapt(plot="mean", X_test=X_test, Y_test=y_test)
 
-    print(model.assess_log_mse(X_test, y_test))
+    print("log mse: {}".format(model.assess_log_mse(X_test, y_test)))
 
-    # model.plot_forecast(5)
+    # model.plot_forecast(2)
     plt.show()
