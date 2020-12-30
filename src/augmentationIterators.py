@@ -41,7 +41,7 @@ class EvenAugmentation(AbstractAugmIterator):
                     self.sign = 1
                 else:
                     self.dim_i += 1
-                return vector
+                return vector 
             if self.sign == 1:
                 vector[self.dim_i] = self.i
                 if self.dim_i == self.dim - 1:
@@ -50,7 +50,7 @@ class EvenAugmentation(AbstractAugmIterator):
                     self.i += 1
                 else:
                     self.dim_i += 1
-                return vector
+                return vector 
 
         self.reset()
         raise StopIteration
@@ -60,7 +60,8 @@ class EvenAugmentation(AbstractAugmIterator):
 
     def reset(self):
         self.i = 0
-        self.sign = 1
+        self.sign = -1
+        self.dim_i = 0
 
 
 class BackwardAugmentation(AbstractAugmIterator):
@@ -92,3 +93,4 @@ class BackwardAugmentation(AbstractAugmIterator):
 
     def reset(self):
         self.i = 0
+        self.dim_i = 0

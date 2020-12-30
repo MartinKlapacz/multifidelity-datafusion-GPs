@@ -65,7 +65,7 @@ class DataAugmentationGP(AbstractGP):
         self.hf_model = GPy.models.GPRegression(
             X=augmented_hf_X,
             Y=self.hf_Y,
-            kernel= None, # self.NARGP_kernel(),
+            kernel=self.NARGP_kernel(),
             initialize=True
         )
         self.hf_model.optimize_restarts(num_restarts=6, verbose=False)  # ARD
