@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 from src.abstractGP import AbstractGP
 from src.augmentationIterators import EvenAugmentation, BackwardAugmentation
 from sklearn.metrics import mean_squared_error
+from scipy.optimize import fmin
 from time import sleep
 
 
@@ -100,13 +101,14 @@ class MultifidelityDataFusion(AbstractGP):
             'Uncertainty development during the adaptation process')
         log_mses = []
 
-        axs_flat = axs.flatten()
+        # axs_flat = axs.flatten()
         for i in range(self.adapt_steps):
             acquired_x = self.get_input_with_highest_uncertainty()
             if verbose:
                 print('new x acquired: {}'.format(acquired_x))
             _, uncertainties = self.predict(X)
-            ax = axs_flat[i]
+            # todo: for steps = 1, flatten() will fail
+            ax = axs.flatten()[i]
             ax.axes.xaxis.set_visible(False)
             log_mse = self.assess_log_mse(X_test, Y_test)
             log_mses.append(log_mse)
@@ -147,28 +149,15 @@ class MultifidelityDataFusion(AbstractGP):
             self.fit(np.append(self.hf_X, acquired_x))
 
     def get_input_with_highest_uncertainty(self, precision: int = 300):
-        if len(self.acquired_X) > 0:
-            uncertainty_intervals = np.concatenate([
-                np.array([self.a])[:, None],
-                self.acquired_X,
-                np.array([self.b])[:, None]
-            ])
-        else:
-            uncertainty_intervals = np.array([self.a, self.b])[:, None]
-        current_input = -1
-        current_uncertainty = -1
-        for i, _ in enumerate(uncertainty_intervals[:-1]):
-            X = np.linspace(
-                uncertainty_intervals[i], uncertainty_intervals[i+1], precision).reshape(-1, 1)
-            _, uncertainties = self.predict(X)
-            high_uncertainty_index = np.argmax(uncertainties)
-            if current_uncertainty < uncertainties[high_uncertainty_index]:
-                current_uncertainty = uncertainties[high_uncertainty_index]
-                current_input = X[high_uncertainty_index]
-                print(current_uncertainty)
-        self.acquired_X.append(current_input)
-        print('------')
-        return current_input
+        def acquisition_curve(x):
+            X = np.array(x).reshape(-1, 1)
+            res = self.predict(X)
+            return 1 / res[1]
+        
+
+        start = np.array(np.array([(self.b - self.a) / 2])).reshape(-1, 1)
+        xopt, fopt, _, _, allvecs = fmin(acquisition_curve, start, maxiter=20, full_output=True)
+        return xopt
 
     def __adapt_lf(self):
         X = np.linspace(self.a, self.b, 100).reshape(-1, 1)
@@ -278,14 +267,11 @@ class MultifidelityDataFusion(AbstractGP):
 
     def __update_input_borders(self, X: np.ndarray):
         if self.a == None and self.b == None:
-            self.a = np.min(X)
-            self.b = np.max(X)
+            self.a = np.min(X, axis=0)
+            self.b = np.max(X, axis=0)
         else:
-            if np.min(X) < self.a:
-                self.a = np.min(X)
-            if self.b < np.max(X):
-                self.b = np.max(X)
-
+            self.a = np.min([self.a, np.min(X, axis=0)], axis=0)
+            self.b = np.max([self.b, np.max(X, axis=0)], axis=0)
 #   GP_augmented_data, select better kernel than RBF
 #   NARGP
 #   MFDGP
