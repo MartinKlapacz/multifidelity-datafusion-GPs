@@ -1,4 +1,5 @@
 import abc
+import numpy as np
 
 class AbstractAugmIterator(metaclass=abc.ABCMeta):
     def __iter__(self):
@@ -49,19 +50,38 @@ class EvenAugmentation(AbstractAugmIterator):
 
 class BackwardAugmentation(AbstractAugmIterator):
     # generates a number sequence 0, -1, -2, ..., -n
-    def __init__(self, n):
+    def __init__(self, n, dim=1):
         self.reset()
         self.n = n
+        self.dim = dim
+        self.dim_i = 0
 
     def __next__(self):
+        vector = np.zeros(self.dim)
+        if self.i == 0:
+            self.i = 1
+            return vector
         if self.i <= self.n:
-            self.i += 1
-            return -self.i + 1
+            vector[self.dim_i] = -self.i
+            if self.dim_i == self.dim - 1:
+                self.i += 1
+                self.dim_i = 0
+            else:
+                self.dim_i += 1
+            return vector
         self.reset()
         raise StopIteration
 
     def numOfNewAugmentationEntries(self):
-        return self.n + 1
+        return self.n * self.dim + 1
 
     def reset(self):
         self.i = 0
+
+
+iterator = BackwardAugmentation(3, dim=10)
+j = 0
+for i in iterator:
+    j += 1
+print(j)
+print(iterator.numOfNewAugmentationEntries())
