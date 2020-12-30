@@ -1,2 +1,2 @@
-from src.dataAugmentationGP import DataAugmentationGP
+from src.MFDataFusion import MultifidelityDataFusion
 from src.exampleDatasets import *

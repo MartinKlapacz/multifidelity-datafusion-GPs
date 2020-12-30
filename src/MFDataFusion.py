@@ -8,7 +8,7 @@ from sklearn.metrics import mean_squared_error
 from time import sleep
 
 
-class DataAugmentationGP(AbstractGP):
+class MultifidelityDataFusion(AbstractGP):
 
     def __init__(self, tau: float, n: int, input_dim: int, f_high: callable, adapt_steps: int = 0, f_low: callable = None, lf_X: np.ndarray = None, lf_Y: np.ndarray = None, lf_hf_adapt_ratio: int = 1,):
         '''
