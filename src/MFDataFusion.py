@@ -7,6 +7,7 @@ from src.augmentationIterators import EvenAugmentation, BackwardAugmentation
 from sklearn.metrics import mean_squared_error
 from scipy.optimize import fmin
 from time import sleep
+import sys
 
 
 class MultifidelityDataFusion(AbstractGP):
@@ -112,7 +113,8 @@ class MultifidelityDataFusion(AbstractGP):
             ax.axes.xaxis.set_visible(False)
             log_mse = self.assess_log_mse(X_test, Y_test)
             log_mses.append(log_mse)
-            ax.set_title('log mse: {}, high-f. points: {}'.format(log_mse, len(self.hf_X)))
+            ax.set_title(
+                'log mse: {}, high-f. points: {}'.format(log_mse, len(self.hf_X)))
             ax.plot(X, uncertainties)
             ax.plot(acquired_x.reshape(-1, 1), 0, 'rx')
             self.fit(np.append(self.hf_X, acquired_x))
@@ -125,9 +127,9 @@ class MultifidelityDataFusion(AbstractGP):
         hf_X_len_before = len(self.hf_X) - self.adapt_steps
         hf_X_len_now = len(self.hf_X)
         plt.plot(
-            np.arange(hf_X_len_before, hf_X_len_now), 
+            np.arange(hf_X_len_before, hf_X_len_now),
             np.array(log_mses)
-)
+        )
 
     def __adapt_plot_means(self, X_test=None, Y_test=None, verbose=False):
         X = np.linspace(self.a, self.b, 200).reshape(-1, 1)
@@ -148,16 +150,24 @@ class MultifidelityDataFusion(AbstractGP):
                 print('new x acquired: {}'.format(acquired_x))
             self.fit(np.append(self.hf_X, acquired_x))
 
-    def get_input_with_highest_uncertainty(self, precision: int = 300):
-        def acquisition_curve(x):
-            X = np.array(x).reshape(-1, 1)
-            res = self.predict(X)
-            return 1 / res[1]
-        
+    def __acquisition_curve(self, x):
+        X = x.reshape(-1, 1)
+        uncertainty = self.predict(X)[1]
+        return 1 / uncertainty
 
-        start = np.array(np.array([(self.b - self.a) / 2])).reshape(-1, 1)
-        xopt, fopt, _, _, allvecs = fmin(acquisition_curve, start, maxiter=20, full_output=True)
-        return xopt
+    def get_input_with_highest_uncertainty(self, restarts: int = 20):
+        best_xopt = 0
+        best_fopt = sys.maxsize
+        random_vector = np.random.uniform(size=(restarts, self.input_dim))
+        start_positions = self.a + random_vector * (self.b - self.a)
+
+        for start in start_positions:
+            xopt, fopt, _, _, allvecs = fmin(
+                self.__acquisition_curve, start, full_output=True, disp=False)
+            if fopt < best_fopt and self.a < xopt and xopt < self.b:
+                best_fopt = fopt
+                best_xopt = xopt
+        return best_xopt
 
     def __adapt_lf(self):
         X = np.linspace(self.a, self.b, 100).reshape(-1, 1)
