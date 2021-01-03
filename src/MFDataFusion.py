@@ -6,9 +6,16 @@ from src.abstractGP import AbstractGP
 from src.augmentationIterators import EvenAugmentation, BackwardAugmentation
 from sklearn.metrics import mean_squared_error
 from scipy.optimize import fmin
-from time import sleep
+import time
 import sys
 
+def timer(func):
+        def wrapper(*args):
+            start = time.time()
+            func(*args)
+            end = time.time()
+            print("duration: {}".format(end - start))
+        return wrapper
 
 class MultifidelityDataFusion(AbstractGP):
 
@@ -155,6 +162,7 @@ class MultifidelityDataFusion(AbstractGP):
         uncertainty = self.predict(X)[1]
         return 1 / uncertainty
 
+    @timer
     def get_input_with_highest_uncertainty(self, restarts: int = 20):
         best_xopt = 0
         best_fopt = sys.maxsize
