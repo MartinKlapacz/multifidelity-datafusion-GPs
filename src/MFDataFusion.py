@@ -8,14 +8,16 @@ from sklearn.metrics import mean_squared_error
 from scipy.optimize import fmin
 import time
 import sys
+import multiprocessing
 
 def timer(func):
-        def wrapper(*args):
-            start = time.time()
-            func(*args)
-            end = time.time()
-            print("duration: {}".format(end - start))
-        return wrapper
+    def wrapper(*args):
+        start = time.time()
+        res = func(*args)
+        end = time.time()
+        print("hf point acquisition duration: {}".format(end - start))
+        return res
+    return wrapper
 
 class MultifidelityDataFusion(AbstractGP):
 
@@ -79,14 +81,22 @@ class MultifidelityDataFusion(AbstractGP):
         )
         self.hf_model.optimize_restarts(num_restarts=6, verbose=False)  # ARD
 
-    def adapt(self, plot=False, X_test=None, Y_test=None, verbose=False):
+    def adapt(self, a=None, b=None, plot=None, X_test=None, Y_test=None, verbose=False):
+        if a is not None:
+            self.a = a
+        if b is not None:
+            self.b = b
+        assert self.adapt_steps > 0
         if plot == 'uncertainty':
+            assert self.input_dim == 1
             self.__adapt_plot_uncertainties(
                 X_test=X_test, Y_test=Y_test, verbose=verbose)
         elif plot == 'mean':
+            assert self.input_dim == 1
             self.__adapt_plot_means(
                 X_test=X_test, Y_test=Y_test, verbose=verbose)
-        elif plot == False:
+        elif plot is None:
+            assert self.input_dim > 0
             self.__adapt_no_plot(verbose=verbose)
         else:
             raise Exception(
@@ -94,8 +104,6 @@ class MultifidelityDataFusion(AbstractGP):
 
     def __adapt_plot_uncertainties(self, X_test=None, Y_test=None, verbose=False):
         X = np.linspace(self.a, self.b, 200).reshape(-1, 1)
-        assert self.input_dim == 1
-        assert self.adapt_steps > 0
         # prepare subplotting
         subplots_per_row = int(np.ceil(np.sqrt(self.adapt_steps)))
         subplots_per_column = int(np.ceil(self.adapt_steps / subplots_per_row))
@@ -150,7 +158,6 @@ class MultifidelityDataFusion(AbstractGP):
         plt.legend()
 
     def __adapt_no_plot(self, verbose=False):
-        X = np.linspace(self.a, self.b, 200).reshape(-1, 1)
         for i in range(self.adapt_steps):
             acquired_x = self.get_input_with_highest_uncertainty()
             if verbose:
@@ -169,6 +176,7 @@ class MultifidelityDataFusion(AbstractGP):
         random_vector = np.random.uniform(size=(restarts, self.input_dim))
         start_positions = self.a + random_vector * (self.b - self.a)
 
+        # TODO: parallelize
         for start in start_positions:
             xopt, fopt, _, _, allvecs = fmin(
                 self.__acquisition_curve, start, full_output=True, disp=False)
@@ -176,6 +184,15 @@ class MultifidelityDataFusion(AbstractGP):
                 best_fopt = fopt
                 best_xopt = xopt
         return best_xopt
+
+    # def parallel_stuff(self, restarts: int = 20):
+    #     best_xopt = 0
+    #     best_fopt = sys.maxsize
+    #     random_vector = np.random.uniform(size=(restarts, self.input_dim))
+    #     start_positions = self.a + random_vector * (self.b - self.a)
+
+    #     cpu_count = multiprocessing.cpu_count()
+    #     threads = [thread for thread in range(cpu_count)]
 
     def __adapt_lf(self):
         X = np.linspace(self.a, self.b, 100).reshape(-1, 1)
@@ -211,7 +228,7 @@ class MultifidelityDataFusion(AbstractGP):
         return uncertainties
 
     def plot(self):
-        assert self.input_dim == 1, '2d plots need one-dimensional data'
+        assert self.input_dim == 1, 'data must be 2 dimensional in order to be plotted'
         self.__plot()
 
     def plot_forecast(self, forecast_range=.5):
