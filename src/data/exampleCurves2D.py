@@ -6,16 +6,6 @@ import matplotlib.pyplot as plt
 
 np.random.seed(42)
 
-def get_Mauna_Loa_data(reduce_by: int = 1):
-    with open("./datasets/mauna_loa", 'rb') as fid:
-        data = pickle.load(fid)
-    X_train = data.get('X')[::reduce_by]
-    y_train = data.get('Y')[::reduce_by]
-    X_test = data.get('Xtest')[::reduce_by]
-    y_test = data.get('Ytest')[::reduce_by]
-    return X_train, y_train, X_test, y_test
-
-
 def get_example_data1():
     def f_low(t): return np.sin(8 * pi * t)
     def f_high(t): return np.sin(8 * pi * t)**2
@@ -40,6 +30,8 @@ def get_example_data5():
     def f_low(t): return np.sin(8 * pi * t)
     def f_high(t): return t**2 +  np.sin(8 * pi * t + pi/10)
     return get_example_data(f_low, f_high)
+
+
 
 
 def get_example_data(f_low, f_high):
