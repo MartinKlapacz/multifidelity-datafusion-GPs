@@ -42,7 +42,7 @@ def get_example_data(f_low, f_high):
     f_low = np.vectorize(f_low)
     f_high = np.vectorize(f_high)
 
-    hf_size = 3
+    hf_size = 6
     lf_size = 80
     N = lf_size + hf_size
 

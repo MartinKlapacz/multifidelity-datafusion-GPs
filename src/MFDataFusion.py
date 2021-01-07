@@ -66,7 +66,9 @@ class MultifidelityDataFusion(AbstractGP):
             self.__lf_mean_predict = f_low
 
     def fit(self, hf_X):
-        self.hf_X = hf_X.reshape(-1,1)
+        self.hf_X = hf_X
+        if self.hf_X.ndim == 1:
+            self.hf_X = hf_X.reshape(-1,1)
         self.__update_input_borders(hf_X)
         # high fidelity data is as precise as ground truth data
 
@@ -237,6 +239,8 @@ class MultifidelityDataFusion(AbstractGP):
         self.__plot(exceed_range_by=forecast_range)
 
     def assess_log_mse(self, X_test, y_test):
+        assert X_test.shape[1] == self.input_dim
+        assert y_test.shape[1] == 1
         predictions = self.predict_means(X_test)
         mse = mean_squared_error(y_true=y_test, y_pred=predictions)
         log_mse = np.log2(mse)
@@ -246,7 +250,7 @@ class MultifidelityDataFusion(AbstractGP):
         std_input_dim = self.input_dim
         std_indezes = np.arange(self.input_dim)
 
-        aug_input_dim = self.augm_iterator.numOfNewAugmentationEntries()
+        aug_input_dim = self.augm_iterator.new_entries_count()
         aug_indezes = np.arange(self.input_dim, self.input_dim + aug_input_dim)
 
         kern1 = kern_class1(aug_input_dim, active_dims=aug_indezes)
@@ -295,13 +299,29 @@ class MultifidelityDataFusion(AbstractGP):
         plt.legend()
 
     def __augment_Data(self, X):
-        print(X.shape)
-        assert X.shape[1] == self.input_dim
-        assert len(X) > 0, 'input must be non-empty'
-        augm_locations = np.array(list(X + i * self.tau for i in self.augm_iterator))
+        n = len(X)
+        new_entries_count = self.augm_iterator.new_entries_count()
+
+        assert X.shape == (len(X), self.input_dim)
+
+        augm_locations = np.array(list(map(lambda x: [x + i * self.tau for i in self.augm_iterator], X)))
+        
+        assert augm_locations.shape == (len(X), new_entries_count, self.input_dim)
+        
         new_augm_entries = self.__lf_mean_predict(augm_locations)
-        new_entries = np.concatenate(new_augm_entries, axis=1)
-        return np.concatenate([X, new_entries], axis=1)
+        
+        assert new_augm_entries.shape == (len(X), new_entries_count, 1)
+        
+        new_entries = np.array([entry.flatten() for entry in new_augm_entries])
+
+    
+        assert new_entries.shape == (len(X), new_entries_count)
+
+        augmented_X = np.concatenate([X, new_entries], axis=1)
+
+        assert augmented_X.shape == (len(X), new_entries_count + 1)
+        
+        return augmented_X
 
     def __update_input_borders(self, X: np.ndarray):
         if self.a == None and self.b == None:

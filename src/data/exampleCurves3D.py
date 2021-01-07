@@ -20,7 +20,7 @@ def get_example_data1():
 
 def get_example_data(f_low, f_high):
 
-    hf_size = 3
+    hf_size = 1
     lf_size = 80
     N = lf_size + hf_size
 

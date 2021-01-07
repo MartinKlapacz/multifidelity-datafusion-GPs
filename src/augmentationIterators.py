@@ -11,7 +11,7 @@ class AbstractAugmIterator(metaclass=abc.ABCMeta):
         pass
 
     @abc.abstractmethod
-    def numOfNewAugmentationEntries(self):
+    def new_entries_count(self):
         pass
 
     @abc.abstractmethod
@@ -55,7 +55,7 @@ class EvenAugmentation(AbstractAugmIterator):
         self.reset()
         raise StopIteration
 
-    def numOfNewAugmentationEntries(self):
+    def new_entries_count(self):
         return 2 * self.n * self.dim + 1
 
     def reset(self):
@@ -88,7 +88,7 @@ class BackwardAugmentation(AbstractAugmIterator):
         self.reset()
         raise StopIteration
 
-    def numOfNewAugmentationEntries(self):
+    def new_entries_count(self):
         return self.n * self.dim + 1
 
     def reset(self):
