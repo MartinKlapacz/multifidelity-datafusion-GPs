@@ -42,7 +42,7 @@ class MultifidelityDataFusion(AbstractGP):
         self.adapt_steps = adapt_steps
         self.lf_hf_adapt_ratio = lf_hf_adapt_ratio
         self.a = self.b = None
-        self.augm_iterator = EvenAugmentation(self.n)
+        self.augm_iterator = BackwardAugmentation(self.n, dim=input_dim)
         self.acquired_X = []
 
         lf_model_params_are_valid = (f_low is not None) ^ (
@@ -66,9 +66,11 @@ class MultifidelityDataFusion(AbstractGP):
             self.__lf_mean_predict = f_low
 
     def fit(self, hf_X):
+        self.hf_X = hf_X.reshape(-1,1)
         self.__update_input_borders(hf_X)
-        self.hf_X = hf_X.reshape(-1, 1)
         # high fidelity data is as precise as ground truth data
+
+        # TODO
         self.hf_Y = self.__f_high_real(self.hf_X)
         # augment input data before prediction
         augmented_hf_X = self.__augment_Data(self.hf_X)
@@ -293,11 +295,12 @@ class MultifidelityDataFusion(AbstractGP):
         plt.legend()
 
     def __augment_Data(self, X):
-        assert isinstance(X, np.ndarray), 'input must be an array'
+        print(X.shape)
+        assert X.shape[1] == self.input_dim
         assert len(X) > 0, 'input must be non-empty'
-        new_entries = np.concatenate([
-            self.__lf_mean_predict(X + i * self.tau) for i in self.augm_iterator
-        ], axis=1)
+        augm_locations = np.array(list(X + i * self.tau for i in self.augm_iterator))
+        new_augm_entries = self.__lf_mean_predict(augm_locations)
+        new_entries = np.concatenate(new_augm_entries, axis=1)
         return np.concatenate([X, new_entries], axis=1)
 
     def __update_input_borders(self, X: np.ndarray):
