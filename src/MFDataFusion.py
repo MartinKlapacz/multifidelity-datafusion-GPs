@@ -42,7 +42,7 @@ class MultifidelityDataFusion(AbstractGP):
         self.adapt_steps = adapt_steps
         self.lf_hf_adapt_ratio = lf_hf_adapt_ratio
         self.a = self.b = None
-        self.augm_iterator = BackwardAugmentation(self.n, dim=input_dim)
+        self.augm_iterator = EvenAugmentation(self.n, dim=input_dim)
         self.acquired_X = []
 
         lf_model_params_are_valid = (f_low is not None) ^ (
@@ -69,11 +69,13 @@ class MultifidelityDataFusion(AbstractGP):
         self.hf_X = hf_X
         if self.hf_X.ndim == 1:
             self.hf_X = hf_X.reshape(-1,1)
+        assert self.hf_X.shape[1] == self.input_dim
         self.__update_input_borders(hf_X)
         # high fidelity data is as precise as ground truth data
 
         # TODO
         self.hf_Y = self.__f_high_real(self.hf_X)
+        assert self.hf_Y.shape == (len(self.hf_X), 1)
         # augment input data before prediction
         augmented_hf_X = self.__augment_Data(self.hf_X)
 
@@ -90,6 +92,7 @@ class MultifidelityDataFusion(AbstractGP):
             self.a = a
         if b is not None:
             self.b = b
+        assert a.shape == b.shape and len(a) == self.input_dim
         assert self.adapt_steps > 0
         if plot == 'uncertainty':
             assert self.input_dim == 1
@@ -166,16 +169,19 @@ class MultifidelityDataFusion(AbstractGP):
             acquired_x = self.get_input_with_highest_uncertainty()
             if verbose:
                 print('new x acquired: {}'.format(acquired_x))
-            self.fit(np.append(self.hf_X, acquired_x))
+            new_hf_X = np.append(self.hf_X, [acquired_x], axis=0)
+            assert new_hf_X.shape == (len(self.hf_X) + 1, self.input_dim)
+            self.fit(new_hf_X)
 
     def __acquisition_curve(self, x):
-        X = x.reshape(-1, 1)
-        uncertainty = self.predict(X)[1]
-        return 1 / uncertainty
+        if x.ndim == 1:
+            X = x[None, :]
+        _, uncertainty = self.predict(X)
+        return - uncertainty
 
     @timer
     def get_input_with_highest_uncertainty(self, restarts: int = 20):
-        best_xopt = 0
+        best_xopt = np.zeros(self.input_dim)
         best_fopt = sys.maxsize
         random_vector = np.random.uniform(size=(restarts, self.input_dim))
         start_positions = self.a + random_vector * (self.b - self.a)
@@ -184,7 +190,7 @@ class MultifidelityDataFusion(AbstractGP):
         for start in start_positions:
             xopt, fopt, _, _, allvecs = fmin(
                 self.__acquisition_curve, start, full_output=True, disp=False)
-            if fopt < best_fopt and self.a < xopt and xopt < self.b:
+            if fopt < best_fopt and np.all(self.a < xopt) and np.all(xopt < self.b):
                 best_fopt = fopt
                 best_xopt = xopt
         return best_xopt
@@ -299,32 +305,28 @@ class MultifidelityDataFusion(AbstractGP):
         plt.legend()
 
     def __augment_Data(self, X):
+        assert X.shape == (len(X), self.input_dim)
+
         n = len(X)
         new_entries_count = self.augm_iterator.new_entries_count()
 
-        assert X.shape == (len(X), self.input_dim)
-
         augm_locations = np.array(list(map(lambda x: [x + i * self.tau for i in self.augm_iterator], X)))
-        
         assert augm_locations.shape == (len(X), new_entries_count, self.input_dim)
         
-        new_augm_entries = self.__lf_mean_predict(augm_locations)
-        
+        # new_augm_entries = self.__lf_mean_predict(augm_locations)
+        new_augm_entries = np.array(list(map(self.__lf_mean_predict, augm_locations)))
+
         assert new_augm_entries.shape == (len(X), new_entries_count, 1)
         
         new_entries = np.array([entry.flatten() for entry in new_augm_entries])
-
-    
         assert new_entries.shape == (len(X), new_entries_count)
 
         augmented_X = np.concatenate([X, new_entries], axis=1)
-
-        assert augmented_X.shape == (len(X), new_entries_count + 1)
-        
+        assert augmented_X.shape == (len(X), new_entries_count + self.input_dim)
         return augmented_X
 
     def __update_input_borders(self, X: np.ndarray):
-        if self.a == None and self.b == None:
+        if self.a is None and self.b is None:
             self.a = np.min(X, axis=0)
             self.b = np.max(X, axis=0)
         else:
