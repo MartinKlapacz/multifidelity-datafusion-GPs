@@ -5,10 +5,21 @@ import matplotlib.pyplot as plt
 from src.abstractGP import AbstractGP
 from src.augmentationIterators import EvenAugmentation, BackwardAugmentation
 from sklearn.metrics import mean_squared_error
-from time import sleep
+from scipy.optimize import fmin
+import time
+import sys
+import multiprocessing
 
+def timer(func):
+    def wrapper(*args):
+        start = time.time()
+        res = func(*args)
+        end = time.time()
+        print("hf point acquisition duration: {}".format(end - start))
+        return res
+    return wrapper
 
-class DataAugmentationGP(AbstractGP):
+class MultifidelityDataFusion(AbstractGP):
 
     def __init__(self, tau: float, n: int, input_dim: int, f_high: callable, adapt_steps: int = 0, f_low: callable = None, lf_X: np.ndarray = None, lf_Y: np.ndarray = None, lf_hf_adapt_ratio: int = 1,):
         '''
@@ -31,7 +42,7 @@ class DataAugmentationGP(AbstractGP):
         self.adapt_steps = adapt_steps
         self.lf_hf_adapt_ratio = lf_hf_adapt_ratio
         self.a = self.b = None
-        self.augm_iterator = EvenAugmentation(self.n)
+        self.augm_iterator = EvenAugmentation(self.n, dim=input_dim)
         self.acquired_X = []
 
         lf_model_params_are_valid = (f_low is not None) ^ (
@@ -55,29 +66,44 @@ class DataAugmentationGP(AbstractGP):
             self.__lf_mean_predict = f_low
 
     def fit(self, hf_X):
+        self.hf_X = hf_X
+        if self.hf_X.ndim == 1:
+            self.hf_X = hf_X.reshape(-1,1)
+        assert self.hf_X.shape[1] == self.input_dim
         self.__update_input_borders(hf_X)
-        self.hf_X = hf_X.reshape(-1, 1)
         # high fidelity data is as precise as ground truth data
+
+        # TODO
         self.hf_Y = self.__f_high_real(self.hf_X)
+        assert self.hf_Y.shape == (len(self.hf_X), 1)
         # augment input data before prediction
         augmented_hf_X = self.__augment_Data(self.hf_X)
 
         self.hf_model = GPy.models.GPRegression(
             X=augmented_hf_X,
             Y=self.hf_Y,
-            kernel= None, # self.NARGP_kernel(),
+            kernel=self.NARGP_kernel(),
             initialize=True
         )
         self.hf_model.optimize_restarts(num_restarts=6, verbose=False)  # ARD
 
-    def adapt(self, plot=False, X_test=None, Y_test=None, verbose=False):
+    def adapt(self, a=None, b=None, plot=None, X_test=None, Y_test=None, verbose=False):
+        if a is not None:
+            self.a = a
+        if b is not None:
+            self.b = b
+        assert a.shape == b.shape and len(a) == self.input_dim
+        assert self.adapt_steps > 0
         if plot == 'uncertainty':
+            assert self.input_dim == 1
             self.__adapt_plot_uncertainties(
                 X_test=X_test, Y_test=Y_test, verbose=verbose)
         elif plot == 'mean':
+            assert self.input_dim == 1
             self.__adapt_plot_means(
                 X_test=X_test, Y_test=Y_test, verbose=verbose)
-        elif plot == False:
+        elif plot is None:
+            assert self.input_dim > 0
             self.__adapt_no_plot(verbose=verbose)
         else:
             raise Exception(
@@ -85,8 +111,6 @@ class DataAugmentationGP(AbstractGP):
 
     def __adapt_plot_uncertainties(self, X_test=None, Y_test=None, verbose=False):
         X = np.linspace(self.a, self.b, 200).reshape(-1, 1)
-        assert self.input_dim == 1
-        assert self.adapt_steps > 0
         # prepare subplotting
         subplots_per_row = int(np.ceil(np.sqrt(self.adapt_steps)))
         subplots_per_column = int(np.ceil(self.adapt_steps / subplots_per_row))
@@ -100,17 +124,19 @@ class DataAugmentationGP(AbstractGP):
             'Uncertainty development during the adaptation process')
         log_mses = []
 
-        axs_flat = axs.flatten()
+        # axs_flat = axs.flatten()
         for i in range(self.adapt_steps):
             acquired_x = self.get_input_with_highest_uncertainty()
             if verbose:
                 print('new x acquired: {}'.format(acquired_x))
             _, uncertainties = self.predict(X)
-            ax = axs_flat[i]
+            # todo: for steps = 1, flatten() will fail
+            ax = axs.flatten()[i]
             ax.axes.xaxis.set_visible(False)
             log_mse = self.assess_log_mse(X_test, Y_test)
             log_mses.append(log_mse)
-            ax.set_title('log mse: {}, high-f. points: {}'.format(log_mse, len(self.hf_X)))
+            ax.set_title(
+                'log mse: {}, high-f. points: {}'.format(log_mse, len(self.hf_X)))
             ax.plot(X, uncertainties)
             ax.plot(acquired_x.reshape(-1, 1), 0, 'rx')
             self.fit(np.append(self.hf_X, acquired_x))
@@ -123,9 +149,9 @@ class DataAugmentationGP(AbstractGP):
         hf_X_len_before = len(self.hf_X) - self.adapt_steps
         hf_X_len_now = len(self.hf_X)
         plt.plot(
-            np.arange(hf_X_len_before, hf_X_len_now), 
+            np.arange(hf_X_len_before, hf_X_len_now),
             np.array(log_mses)
-)
+        )
 
     def __adapt_plot_means(self, X_test=None, Y_test=None, verbose=False):
         X = np.linspace(self.a, self.b, 200).reshape(-1, 1)
@@ -139,36 +165,44 @@ class DataAugmentationGP(AbstractGP):
         plt.legend()
 
     def __adapt_no_plot(self, verbose=False):
-        X = np.linspace(self.a, self.b, 200).reshape(-1, 1)
         for i in range(self.adapt_steps):
             acquired_x = self.get_input_with_highest_uncertainty()
             if verbose:
                 print('new x acquired: {}'.format(acquired_x))
-            self.fit(np.append(self.hf_X, acquired_x))
+            new_hf_X = np.append(self.hf_X, [acquired_x], axis=0)
+            assert new_hf_X.shape == (len(self.hf_X) + 1, self.input_dim)
+            self.fit(new_hf_X)
 
-    def get_input_with_highest_uncertainty(self, precision: int = 300):
-        if len(self.acquired_X) > 0:
-            uncertainty_intervals = np.concatenate([
-                np.array([self.a])[:, None],
-                self.acquired_X,
-                np.array([self.b])[:, None]
-            ])
-        else:
-            uncertainty_intervals = np.array([self.a, self.b])[:, None]
-        current_input = -1
-        current_uncertainty = -1
-        for i, _ in enumerate(uncertainty_intervals[:-1]):
-            X = np.linspace(
-                uncertainty_intervals[i], uncertainty_intervals[i+1], precision).reshape(-1, 1)
-            _, uncertainties = self.predict(X)
-            high_uncertainty_index = np.argmax(uncertainties)
-            if current_uncertainty < uncertainties[high_uncertainty_index]:
-                current_uncertainty = uncertainties[high_uncertainty_index]
-                current_input = X[high_uncertainty_index]
-                print(current_uncertainty)
-        self.acquired_X.append(current_input)
-        print('------')
-        return current_input
+    def __acquisition_curve(self, x):
+        if x.ndim == 1:
+            X = x[None, :]
+        _, uncertainty = self.predict(X)
+        return - uncertainty
+
+    @timer
+    def get_input_with_highest_uncertainty(self, restarts: int = 20):
+        best_xopt = np.zeros(self.input_dim)
+        best_fopt = sys.maxsize
+        random_vector = np.random.uniform(size=(restarts, self.input_dim))
+        start_positions = self.a + random_vector * (self.b - self.a)
+
+        # TODO: parallelize
+        for start in start_positions:
+            xopt, fopt, _, _, allvecs = fmin(
+                self.__acquisition_curve, start, full_output=True, disp=False)
+            if fopt < best_fopt and np.all(self.a < xopt) and np.all(xopt < self.b):
+                best_fopt = fopt
+                best_xopt = xopt
+        return best_xopt
+
+    # def parallel_stuff(self, restarts: int = 20):
+    #     best_xopt = 0
+    #     best_fopt = sys.maxsize
+    #     random_vector = np.random.uniform(size=(restarts, self.input_dim))
+    #     start_positions = self.a + random_vector * (self.b - self.a)
+
+    #     cpu_count = multiprocessing.cpu_count()
+    #     threads = [thread for thread in range(cpu_count)]
 
     def __adapt_lf(self):
         X = np.linspace(self.a, self.b, 100).reshape(-1, 1)
@@ -204,13 +238,15 @@ class DataAugmentationGP(AbstractGP):
         return uncertainties
 
     def plot(self):
-        assert self.input_dim == 1, '2d plots need one-dimensional data'
+        assert self.input_dim == 1, 'data must be 2 dimensional in order to be plotted'
         self.__plot()
 
     def plot_forecast(self, forecast_range=.5):
         self.__plot(exceed_range_by=forecast_range)
 
     def assess_log_mse(self, X_test, y_test):
+        assert X_test.shape[1] == self.input_dim
+        assert y_test.shape[1] == 1
         predictions = self.predict_means(X_test)
         mse = mean_squared_error(y_true=y_test, y_pred=predictions)
         log_mse = np.log2(mse)
@@ -220,7 +256,7 @@ class DataAugmentationGP(AbstractGP):
         std_input_dim = self.input_dim
         std_indezes = np.arange(self.input_dim)
 
-        aug_input_dim = self.augm_iterator.numOfNewAugmentationEntries()
+        aug_input_dim = self.augm_iterator.new_entries_count()
         aug_indezes = np.arange(self.input_dim, self.input_dim + aug_input_dim)
 
         kern1 = kern_class1(aug_input_dim, active_dims=aug_indezes)
@@ -269,23 +305,33 @@ class DataAugmentationGP(AbstractGP):
         plt.legend()
 
     def __augment_Data(self, X):
-        assert isinstance(X, np.ndarray), 'input must be an array'
-        assert len(X) > 0, 'input must be non-empty'
-        new_entries = np.concatenate([
-            self.__lf_mean_predict(X + i * self.tau) for i in self.augm_iterator
-        ], axis=1)
-        return np.concatenate([X, new_entries], axis=1)
+        assert X.shape == (len(X), self.input_dim)
+
+        n = len(X)
+        new_entries_count = self.augm_iterator.new_entries_count()
+
+        augm_locations = np.array(list(map(lambda x: [x + i * self.tau for i in self.augm_iterator], X)))
+        assert augm_locations.shape == (len(X), new_entries_count, self.input_dim)
+        
+        # new_augm_entries = self.__lf_mean_predict(augm_locations)
+        new_augm_entries = np.array(list(map(self.__lf_mean_predict, augm_locations)))
+
+        assert new_augm_entries.shape == (len(X), new_entries_count, 1)
+        
+        new_entries = np.array([entry.flatten() for entry in new_augm_entries])
+        assert new_entries.shape == (len(X), new_entries_count)
+
+        augmented_X = np.concatenate([X, new_entries], axis=1)
+        assert augmented_X.shape == (len(X), new_entries_count + self.input_dim)
+        return augmented_X
 
     def __update_input_borders(self, X: np.ndarray):
-        if self.a == None and self.b == None:
-            self.a = np.min(X)
-            self.b = np.max(X)
+        if self.a is None and self.b is None:
+            self.a = np.min(X, axis=0)
+            self.b = np.max(X, axis=0)
         else:
-            if np.min(X) < self.a:
-                self.a = np.min(X)
-            if self.b < np.max(X):
-                self.b = np.max(X)
-
+            self.a = np.min([self.a, np.min(X, axis=0)], axis=0)
+            self.b = np.max([self.b, np.max(X, axis=0)], axis=0)
 #   GP_augmented_data, select better kernel than RBF
 #   NARGP
 #   MFDGP

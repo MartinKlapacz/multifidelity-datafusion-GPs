@@ -142,3 +142,4 @@ cython_debug/
 
 # personal
 figures
+main.py
