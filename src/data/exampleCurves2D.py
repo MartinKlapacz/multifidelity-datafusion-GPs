@@ -7,38 +7,39 @@ import matplotlib.pyplot as plt
 np.random.seed(42)
 
 
-def get_example_data1():
+def get_curve1():
     def f_low(t): return np.sin(8 * pi * t)
     def f_high(t): return np.sin(8 * pi * t)**2
-    return get_example_data(f_low, f_high)
+    return get_curve(f_low, f_high)
 
 
-def get_example_data2():
+def get_curve2():
     def f_low(t): return np.sin(8 * pi * t)
     def f_high(t): return t**2 * f_low(t)**2
-    return get_example_data(f_low, f_high)
+    return get_curve(f_low, f_high)
 
-def get_example_data3():
+
+def get_curve3():
     def f_low(t): return np.sin(8 * pi * t)
     def f_high(t): return t**2 * np.sin(8 * pi * t + pi / 10)**2
-    return get_example_data(f_low, f_high)
+    return get_curve(f_low, f_high)
 
 
-def get_example_data4():
+def get_curve4():
     def f_low(t): return np.sin(8 * pi * t)
     def f_high(t): return (t - 1.41) * f_low(t)**2
-    return get_example_data(f_low, f_high)
+    return get_curve(f_low, f_high)
 
 
-def get_example_data5():
+def get_curve5():
     def f_low(t): return np.sin(8 * pi * t)
-    def f_high(t): return t**2 +  np.sin(8 * pi * t + pi/10)
-    return get_example_data(f_low, f_high)
+    def f_high(t): return t**2 + np.sin(8 * pi * t + pi/10)
+    return get_curve(f_low, f_high)
 
 
 
 
-def get_example_data(f_low, f_high):
+def get_curve(f_low, f_high):
     f_low = np.vectorize(f_low)
     f_high = np.vectorize(f_high)
 
@@ -57,8 +58,8 @@ def get_example_data(f_low, f_high):
     X_train_hf = X_train[:hf_size]
     X_train_lf = X_train[hf_size:]
 
-    y_train_hf = f_high(X_train_hf) 
-    y_train_lf = f_low(X_train_lf) 
+    y_train_hf = f_high(X_train_hf)
+    y_train_lf = f_low(X_train_lf)
 
     y_test = f_high(X_test)
 
