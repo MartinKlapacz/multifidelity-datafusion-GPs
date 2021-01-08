@@ -265,7 +265,7 @@ class MultifidelityDataFusion(AbstractGP):
         return kern1 * kern2 + kern3
 
     def __plot(self, confidence_inteval_width=2, plot_lf=True, plot_hf=True, plot_pred=True, exceed_range_by=0):
-        point_density = 500
+        point_density = 1000
         X = np.linspace(self.a, self.b * (1 + exceed_range_by),
                         int(point_density * (1 + exceed_range_by))).reshape(-1, 1)
         pred_mean, pred_variance = self.predict(X.reshape(-1, 1))
