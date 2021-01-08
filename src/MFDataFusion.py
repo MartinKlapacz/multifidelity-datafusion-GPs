@@ -21,7 +21,7 @@ def timer(func):
 
 class MultifidelityDataFusion(AbstractGP):
 
-    def __init__(self, tau: float, n: int, input_dim: int, f_high: callable, adapt_steps: int = 0, f_low: callable = None, lf_X: np.ndarray = None, lf_Y: np.ndarray = None, lf_hf_adapt_ratio: int = 1,):
+    def __init__(self, tau: float, n: int, input_dim: int, f_high: callable, adapt_steps: int = 0, f_low: callable = None, lf_X: np.ndarray = None, lf_Y: np.ndarray = None, lf_hf_adapt_ratio: int = 1, optimize_restarts: int = 20):
         '''
         input: tau
             distance to neighbour points used in taylor expansion
@@ -44,6 +44,7 @@ class MultifidelityDataFusion(AbstractGP):
         self.a = self.b = None
         self.augm_iterator = EvenAugmentation(self.n, dim=input_dim)
         self.acquired_X = []
+        self.optimize_restarts = optimize_restarts
 
         lf_model_params_are_valid = (f_low is not None) ^ (
             (lf_X is not None) and (lf_Y is not None) and (lf_hf_adapt_ratio is not None))
@@ -180,10 +181,10 @@ class MultifidelityDataFusion(AbstractGP):
         return - uncertainty
 
     @timer
-    def get_input_with_highest_uncertainty(self, restarts: int = 20):
+    def get_input_with_highest_uncertainty(self):
         best_xopt = np.zeros(self.input_dim)
         best_fopt = sys.maxsize
-        random_vector = np.random.uniform(size=(restarts, self.input_dim))
+        random_vector = np.random.uniform(size=(self.optimize_restarts, self.input_dim))
         start_positions = self.a + random_vector * (self.b - self.a)
 
         # TODO: parallelize
