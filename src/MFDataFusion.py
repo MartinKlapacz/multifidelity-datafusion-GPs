@@ -176,6 +176,9 @@ class MultifidelityDataFusion(AbstractGP):
             sharex=True,
             figsize=(20, 10))
 
+        axs[0][0].set_ylabel('mean curves', size='large')
+        axs[1][0].set_ylabel('uncertainty curves', size='large')
+
         for i in range(self.adapt_steps):
             acquired_x = self.get_input_with_highest_uncertainty()
             means, uncertainty = self.predict(X)
@@ -194,11 +197,10 @@ class MultifidelityDataFusion(AbstractGP):
                     )
 
             uncertainty_ax = axs[1][i]
-            uncertainty_ax.set_title('{} hf-points'.format(len(self.hf_X)))
             uncertainty_ax.plot(X, uncertainty)
             uncertainty_ax.plot(acquired_x.reshape(-1,1), 0, 'rx')
 
-            self.fit(np.append(self.hf_X, acquired_x)) 
+            self.fit(np.append(self.hf_X, acquired_x))
 
 
     def __adapt_no_plot(self, verbose=False):
