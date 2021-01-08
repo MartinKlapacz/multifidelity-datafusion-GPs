@@ -95,13 +95,17 @@ class MultifidelityDataFusion(AbstractGP):
             self.b = b
         assert a.shape == b.shape and len(a) == self.input_dim
         assert self.adapt_steps > 0
-        if plot == 'uncertainty':
+        if plot == 'u':
             assert self.input_dim == 1
             self.__adapt_plot_uncertainties(
                 X_test=X_test, Y_test=Y_test, verbose=verbose)
-        elif plot == 'mean':
+        elif plot == 'm':
             assert self.input_dim == 1
             self.__adapt_plot_means(
+                X_test=X_test, Y_test=Y_test, verbose=verbose)
+        elif plot =='mu' or plot == 'um':
+            assert self.input_dim == 1
+            self.__adapt_plot_combined(
                 X_test=X_test, Y_test=Y_test, verbose=verbose)
         elif plot is None:
             assert self.input_dim > 0
@@ -158,12 +162,44 @@ class MultifidelityDataFusion(AbstractGP):
         X = np.linspace(self.a, self.b, 200).reshape(-1, 1)
         for i in range(self.adapt_steps):
             acquired_x = self.get_input_with_highest_uncertainty()
-            if verbose:
-                print('new x acquired: {}'.format(acquired_x))
             means, _ = self.predict(X)
             plt.plot(X, means, label='step {}'.format(i))
             self.fit(np.append(self.hf_X, acquired_x))
         plt.legend()
+
+    def __adapt_plot_combined(self, X_test=None, Y_test=None, verbose=False):
+        X = np.linspace(self.a, self.b, 200).reshape(-1, 1)
+        fig, axs = plt.subplots(
+            2,
+            self.adapt_steps,
+            sharey='row',
+            sharex=True,
+            figsize=(20, 10))
+
+        for i in range(self.adapt_steps):
+            acquired_x = self.get_input_with_highest_uncertainty()
+            means, uncertainty = self.predict(X)
+            means = means.flatten()
+            uncertainty = uncertainty.flatten()
+
+            mean_ax = axs[0][i]
+            mean_ax.set_title('{} hf-points'.format(len(self.hf_X)))
+            mean_ax.plot(X, means, 'g')
+            mean_ax.plot(X, self.f_low(X), 'r')
+            mean_ax.plot(X, self.__f_high_real(X), 'b')
+            mean_ax.fill_between(X.flatten(),
+                    y1=means - 2 * uncertainty,
+                    y2=means + 2 * uncertainty,
+                    color=(0, 1, 0, .75)
+                    )
+
+            uncertainty_ax = axs[1][i]
+            uncertainty_ax.set_title('{} hf-points'.format(len(self.hf_X)))
+            uncertainty_ax.plot(X, uncertainty)
+            uncertainty_ax.plot(acquired_x.reshape(-1,1), 0, 'rx')
+
+            self.fit(np.append(self.hf_X, acquired_x)) 
+
 
     def __adapt_no_plot(self, verbose=False):
         for i in range(self.adapt_steps):
@@ -269,9 +305,9 @@ class MultifidelityDataFusion(AbstractGP):
         point_density = 1000
         X = np.linspace(self.a, self.b * (1 + exceed_range_by),
                         int(point_density * (1 + exceed_range_by))).reshape(-1, 1)
-        pred_mean, pred_variance = self.predict(X.reshape(-1, 1))
-        pred_mean = pred_mean.flatten()
-        pred_variance = pred_variance.flatten()
+        mean, uncertainty = self.predict(X.reshape(-1, 1))
+        mean = mean.flatten()
+        uncertainty = uncertainty.flatten()
 
         if (not self.data_driven_lf_approach):
             self.lf_X = np.linspace(self.a, self.b, 50).reshape(-1, 1)
@@ -296,10 +332,10 @@ class MultifidelityDataFusion(AbstractGP):
 
         if plot_pred:
             # plot prediction
-            plt.plot(X, pred_mean, pred_color, label='prediction')
+            plt.plot(X, mean, pred_color, label='prediction')
             plt.fill_between(X.flatten(),
-                             y1=pred_mean - confidence_inteval_width * pred_variance,
-                             y2=pred_mean + confidence_inteval_width * pred_variance,
+                             y1=mean - confidence_inteval_width * uncertainty,
+                             y2=mean + confidence_inteval_width * uncertainty,
                              color=(0, 1, 0, .75)
                              )
 
