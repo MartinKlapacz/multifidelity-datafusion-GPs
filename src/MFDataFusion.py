@@ -98,18 +98,22 @@ class MultifidelityDataFusion(AbstractGP):
         if plot == 'u':
             assert self.input_dim == 1
             self.__adapt_plot_uncertainties(
-                X_test=X_test, Y_test=Y_test, verbose=verbose)
+                X_test=X_test, Y_test=Y_test)
         elif plot == 'm':
             assert self.input_dim == 1
             self.__adapt_plot_means(
-                X_test=X_test, Y_test=Y_test, verbose=verbose)
+                X_test=X_test, Y_test=Y_test)
         elif plot =='mu' or plot == 'um':
             assert self.input_dim == 1
             self.__adapt_plot_combined(
-                X_test=X_test, Y_test=Y_test, verbose=verbose)
+                X_test=X_test, Y_test=Y_test)
+        elif plot == 'e':
+            assert self.input_dim == 1
+            self.__adapt_plot_error(
+                X_test=X_test, Y_test=Y_test)
         elif plot is None:
             assert self.input_dim > 0
-            self.__adapt_no_plot(verbose=verbose)
+            self.__adapt_no_plot(X_test=X_test, Y_test=Y_test)
         else:
             raise Exception(
                 'invalid plot mode, use mean, uncertainty or False')
@@ -127,7 +131,6 @@ class MultifidelityDataFusion(AbstractGP):
             figsize=(20, 10))
         fig.suptitle(
             'Uncertainty development during the adaptation process')
-        log_mses = []
 
         # axs_flat = axs.flatten()
         for i in range(self.adapt_steps):
@@ -139,24 +142,12 @@ class MultifidelityDataFusion(AbstractGP):
             ax = axs.flatten()[i]
             ax.axes.xaxis.set_visible(False)
             log_mse = self.assess_log_mse(X_test, Y_test)
-            log_mses.append(log_mse)
             ax.set_title(
                 'log mse: {}, high-f. points: {}'.format(log_mse, len(self.hf_X)))
             ax.plot(X, uncertainties)
             ax.plot(acquired_x.reshape(-1, 1), 0, 'rx')
             self.fit(np.append(self.hf_X, acquired_x))
 
-        # plot log_mse development during adapt process
-        plt.figure(2)
-        plt.title('logarithmic mean square error')
-        plt.xlabel('hf points')
-        plt.ylabel('log mse')
-        hf_X_len_before = len(self.hf_X) - self.adapt_steps
-        hf_X_len_now = len(self.hf_X)
-        plt.plot(
-            np.arange(hf_X_len_before, hf_X_len_now),
-            np.array(log_mses)
-        )
 
     def __adapt_plot_means(self, X_test=None, Y_test=None, verbose=False):
         X = np.linspace(self.a, self.b, 200).reshape(-1, 1)
@@ -202,8 +193,24 @@ class MultifidelityDataFusion(AbstractGP):
 
             self.fit(np.append(self.hf_X, acquired_x))
 
+    def __adapt_plot_error(self, X_test=None, Y_test=None):
+        log_mses = []
+        for i in range(self.adapt_steps):
+            acquired_x = self.get_input_with_highest_uncertainty()
+            self.fit(np.append(self.hf_X, acquired_x))
+            log_mse = self.assess_log_mse(X_test, Y_test)
+            log_mses.append(log_mse)
+        plt.title('logarithmic mean square error')
+        plt.xlabel('hf points')
+        plt.ylabel('log mse')
+        hf_X_len_before = len(self.hf_X) - self.adapt_steps
+        hf_X_len_now = len(self.hf_X)
+        plt.plot(
+            np.arange(hf_X_len_before, hf_X_len_now),
+            np.array(log_mses)
+        )
 
-    def __adapt_no_plot(self, verbose=False):
+    def __adapt_no_plot(self, X_test=None, Y_test=None, verbose=False):
         for i in range(self.adapt_steps):
             acquired_x = self.get_input_with_highest_uncertainty()
             if verbose:
