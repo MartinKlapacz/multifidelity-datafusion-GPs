@@ -21,7 +21,7 @@ def timer(func):
 
 class MultifidelityDataFusion(AbstractGP):
 
-    def __init__(self, tau: float, n: int, input_dim: int, f_high: callable, adapt_steps: int = 0, f_low: callable = None, lf_X: np.ndarray = None, lf_Y: np.ndarray = None, lf_hf_adapt_ratio: int = 1, optimize_restarts: int = 20):
+    def __init__(self, tau: float, n: int, input_dim: int, f_high: callable, f_low: callable = None, lf_X: np.ndarray = None, lf_Y: np.ndarray = None, lf_hf_adapt_ratio: int = 1, optimize_restarts: int = 20, use_composite_kernel: bool = True):
         '''
         input: tau
             distance to neighbour points used in taylor expansion
@@ -39,12 +39,12 @@ class MultifidelityDataFusion(AbstractGP):
         self.input_dim = input_dim
         self.__f_high_real = f_high
         self.f_low = f_low
-        self.adapt_steps = adapt_steps
         self.lf_hf_adapt_ratio = lf_hf_adapt_ratio
         self.a = self.b = None
         self.augm_iterator = EvenAugmentation(self.n, dim=input_dim)
         self.acquired_X = []
         self.optimize_restarts = optimize_restarts
+        self.use_composite_kernel = use_composite_kernel
 
         lf_model_params_are_valid = (f_low is not None) ^ (
             (lf_X is not None) and (lf_Y is not None) and (lf_hf_adapt_ratio is not None))
@@ -80,15 +80,21 @@ class MultifidelityDataFusion(AbstractGP):
         # augment input data before prediction
         augmented_hf_X = self.__augment_Data(self.hf_X)
 
+        if self.use_composite_kernel:
+            kernel = self.NARGP_kernel() 
+        else: 
+            kernel = GPy.kern.RBF(self.input_dim)
+
         self.hf_model = GPy.models.GPRegression(
             X=augmented_hf_X,
             Y=self.hf_Y,
-            kernel=self.NARGP_kernel(),
+            kernel=kernel,
             initialize=True
         )
         self.hf_model.optimize_restarts(num_restarts=6, verbose=False)  # ARD
 
-    def adapt(self, a=None, b=None, plot=None, X_test=None, Y_test=None, verbose=False):
+    def adapt(self, a=None, b=None, adapt_steps=10, plot=None, X_test=None, Y_test=None, verbose=False):
+        self.adapt_steps = adapt_steps
         if a is not None:
             self.a = a
         if b is not None:
