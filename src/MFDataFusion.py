@@ -9,6 +9,7 @@ from scipy.optimize import fmin
 import time
 import sys
 import multiprocessing
+import concurrent.futures
 
 def timer(func):
     def wrapper(*args):
@@ -240,21 +241,34 @@ class MultifidelityDataFusion(AbstractGP):
 
         # TODO: parallelize
         for start in start_positions:
-            xopt, fopt, _, _, allvecs = fmin(
+            xopt, fopt, _, _, _ = fmin(
                 self.__acquisition_curve, start, full_output=True, disp=False)
             if fopt < best_fopt and np.all(self.a < xopt) and np.all(xopt < self.b):
                 best_fopt = fopt
                 best_xopt = xopt
         return best_xopt
 
-    # def parallel_stuff(self, restarts: int = 20):
-    #     best_xopt = 0
-    #     best_fopt = sys.maxsize
-    #     random_vector = np.random.uniform(size=(restarts, self.input_dim))
-    #     start_positions = self.a + random_vector * (self.b - self.a)
+    @timer
+    def get_input_with_highest_uncertainty_parrallel(self):
+        best_xopt = np.zeros(self.input_dim)
+        best_fopt = sys.maxsize
+        random_vector = np.random.uniform(size=(self.optimize_restarts, self.input_dim))
+        start_positions = self.a + random_vector * (self.b - self.a)
+        def f(x):
+            if x.ndim == 1:
+                X = x[None, :]
+            _, uncertainty = self.predict(X)
+            return - uncertainty
 
-    #     cpu_count = multiprocessing.cpu_count()
-    #     threads = [thread for thread in range(cpu_count)]
+        best_xopt = np.zeros(self.input_dim)
+        best_fopt = sys.maxsize
+        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+            outputs = executor.map(lambda sp: fmin(f, sp, full_output=True, disp=False), start_positions)
+            for xopt, fopt, _, _, _ in outputs:
+                if fopt < best_fopt and np.all(self.a < xopt) and np.all(xopt < self.b):
+                    best_fopt = fopt
+                    best_xopt = xopt
+            return best_xopt
 
     def __adapt_lf(self):
         X = np.linspace(self.a, self.b, 100).reshape(-1, 1)
