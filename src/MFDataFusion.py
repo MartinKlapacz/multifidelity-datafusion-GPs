@@ -84,7 +84,8 @@ class MultifidelityDataFusion(AbstractGP):
         if self.use_composite_kernel:
             kernel = self.NARGP_kernel() 
         else: 
-            kernel = GPy.kern.RBF(self.input_dim)
+            new_input_dims = self.input_dim + self.augm_iterator.new_entries_count()
+            kernel = GPy.kern.RBF(new_input_dims)
 
         self.hf_model = GPy.models.GPRegression(
             X=augmented_hf_X,
@@ -188,6 +189,7 @@ class MultifidelityDataFusion(AbstractGP):
             mean_ax.plot(X, means, 'g')
             mean_ax.plot(X, self.f_low(X), 'r')
             mean_ax.plot(X, self.__f_high_real(X), 'b')
+            mean_ax.plot(self.hf_X, self.hf_Y, 'bx')
             mean_ax.fill_between(X.flatten(),
                     y1=means - 2 * uncertainty,
                     y2=means + 2 * uncertainty,
@@ -232,7 +234,6 @@ class MultifidelityDataFusion(AbstractGP):
         _, uncertainty = self.predict(X)
         return - uncertainty
 
-    @timer
     def get_input_with_highest_uncertainty(self):
         best_xopt = np.zeros(self.input_dim)
         best_fopt = sys.maxsize
@@ -248,7 +249,6 @@ class MultifidelityDataFusion(AbstractGP):
                 best_xopt = xopt
         return best_xopt
 
-    @timer
     def get_input_with_highest_uncertainty_parrallel(self):
         best_xopt = np.zeros(self.input_dim)
         best_fopt = sys.maxsize
