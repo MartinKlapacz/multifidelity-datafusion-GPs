@@ -31,8 +31,8 @@ class MethodAssessment:
         for model in self.models:
             model.plot_forecast(forecast_range)
 
-    def log_mse(self):
+    def mse(self):
         mses = []
         for model in self.models:
-            mses.append(model.assess_log_mse(self.X_test, self.y_test))
+            mses.append(model.assess_mse(self.X_test, self.y_test))
         return mses

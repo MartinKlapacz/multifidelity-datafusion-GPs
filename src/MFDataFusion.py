@@ -150,9 +150,9 @@ class MultifidelityDataFusion(AbstractGP):
             # todo: for steps = 1, flatten() will fail
             ax = axs.flatten()[i]
             ax.axes.xaxis.set_visible(False)
-            log_mse = self.assess_log_mse(X_test, Y_test)
+            mse = self.assess_mse(X_test, Y_test)
             ax.set_title(
-                'log mse: {}, high-f. points: {}'.format(log_mse, len(self.hf_X)))
+                'mse: {}, high-f. points: {}'.format(mse, len(self.hf_X)))
             ax.plot(X, uncertainties)
             ax.plot(acquired_x.reshape(-1, 1), 0, 'rx')
             self.fit(np.append(self.hf_X, acquired_x))
@@ -203,21 +203,22 @@ class MultifidelityDataFusion(AbstractGP):
 
             self.fit(np.append(self.hf_X, acquired_x))
 
-    def __adapt_plot_error(self, X_test=None, Y_test=None):
-        log_mses = []
+    def __adapt_plot_error(self, X_test=None, Y_test=None, yscale='log'):
+        mses = []
         for i in range(self.adapt_steps):
             acquired_x = self.get_input_with_highest_uncertainty()
             self.fit(np.append(self.hf_X, acquired_x))
-            log_mse = self.assess_log_mse(X_test, Y_test)
-            log_mses.append(log_mse)
-        plt.title('logarithmic mean square error')
-        plt.xlabel('hf points')
-        plt.ylabel('log mse')
+            mse = self.assess_mse(X_test, Y_test)
+            mses.append(mse)
         hf_X_len_before = len(self.hf_X) - self.adapt_steps
         hf_X_len_now = len(self.hf_X)
+        plt.title('mean square error')
+        plt.xlabel('hf points')
+        plt.ylabel('mse')
+        plt.yscale(yscale)
         plt.plot(
             np.arange(hf_X_len_before, hf_X_len_now),
-            np.array(log_mses),
+            np.array(mses),
             label=self.name
         )
         plt.legend()
@@ -313,13 +314,12 @@ class MultifidelityDataFusion(AbstractGP):
     def plot_forecast(self, forecast_range=.5):
         self.__plot(exceed_range_by=forecast_range)
 
-    def assess_log_mse(self, X_test, y_test):
+    def assess_mse(self, X_test, y_test):
         assert X_test.shape[1] == self.input_dim
         assert y_test.shape[1] == 1
         predictions = self.predict_means(X_test)
         mse = mean_squared_error(y_true=y_test, y_pred=predictions)
-        log_mse = np.log2(mse)
-        return np.round(log_mse, 4)
+        return np.round(mse, 4)
 
     def NARGP_kernel(self, kern_class1=GPy.kern.RBF, kern_class2=GPy.kern.RBF, kern_class3=GPy.kern.RBF):
         std_input_dim = self.input_dim

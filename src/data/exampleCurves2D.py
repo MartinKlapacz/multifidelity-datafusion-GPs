@@ -109,7 +109,7 @@ def get_curve(f_low, f_high):
     f_low = np.vectorize(f_low)
     f_high = np.vectorize(f_high)
 
-    hf_size = 2
+    hf_size = 3
     lf_size = 80
     N = lf_size + hf_size
 
