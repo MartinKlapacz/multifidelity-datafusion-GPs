@@ -1,5 +1,6 @@
 from src.MFDataFusion import MultifidelityDataFusion
 import threading
+import matplotlib.pyplot as plt
 
 
 class MethodAssessment:
@@ -16,10 +17,19 @@ class MethodAssessment:
             model.fit(hf_X=X_train)
 
     def adapt_models(self, a, b, adapt_steps, plot=None):
+        assert plot in [None, 'e']
         for model in self.models:
             model.adapt(a, b, adapt_steps, plot=plot,
                               X_test=self.X_test, 
                               Y_test=self.y_test)
+
+    def plot(self):
+        for model in self.models:
+            model.plot()
+
+    def plot_forecast(self, forecast_range):
+        for model in self.models:
+            model.plot_forecast(forecast_range)
 
     def log_mse(self):
         mses = []

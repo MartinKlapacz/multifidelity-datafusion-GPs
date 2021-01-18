@@ -22,7 +22,7 @@ def timer(func):
 
 class MultifidelityDataFusion(AbstractGP):
 
-    def __init__(self, tau: float, n: int, input_dim: int, f_high: callable, f_low: callable = None, lf_X: np.ndarray = None, lf_Y: np.ndarray = None, lf_hf_adapt_ratio: int = 1, optimize_restarts: int = 20, use_composite_kernel: bool = True):
+    def __init__(self, tau: float, n: int, input_dim: int, f_high: callable, f_low: callable = None, lf_X: np.ndarray = None, lf_Y: np.ndarray = None, lf_hf_adapt_ratio: int = 1, optimize_restarts: int = 20, use_composite_kernel: bool = True, name: str = None):
         '''
         input: tau
             distance to neighbour points used in taylor expansion
@@ -36,6 +36,7 @@ class MultifidelityDataFusion(AbstractGP):
             if not provided, call self.lf_fit() to train a low-fidelity GP which will be used for low-fidelity predictions instead
         '''
         self.tau = tau
+        self.name = name
         self.n = n
         self.input_dim = input_dim
         self.__f_high_real = f_high
@@ -216,8 +217,10 @@ class MultifidelityDataFusion(AbstractGP):
         hf_X_len_now = len(self.hf_X)
         plt.plot(
             np.arange(hf_X_len_before, hf_X_len_now),
-            np.array(log_mses)
+            np.array(log_mses),
+            label=self.name
         )
+        plt.legend()
 
     def __adapt_no_plot(self, X_test=None, Y_test=None, verbose=False):
         for i in range(self.adapt_steps):
@@ -344,7 +347,7 @@ class MultifidelityDataFusion(AbstractGP):
 
         lf_color, hf_color, pred_color = 'r', 'b', 'g'
 
-        plt.figure(3)
+        plt.figure()
         if plot_lf:
             # plot low fidelity
             plt.plot(self.lf_X, self.lf_Y, lf_color +
@@ -369,6 +372,8 @@ class MultifidelityDataFusion(AbstractGP):
                              )
 
         plt.legend()
+        if self.name:
+            plt.title(self.name)
 
     def __augment_Data(self, X):
         assert X.shape == (len(X), self.input_dim)
