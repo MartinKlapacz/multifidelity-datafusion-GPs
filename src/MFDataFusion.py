@@ -117,7 +117,6 @@ class MultifidelityDataFusion(AbstractGP):
             self.__adapt_plot_combined(
                 X_test=X_test, Y_test=Y_test)
         elif plot == 'e':
-            assert self.input_dim == 1
             self.__adapt_plot_error(
                 X_test=X_test, Y_test=Y_test)
         elif plot is None:
@@ -207,7 +206,7 @@ class MultifidelityDataFusion(AbstractGP):
         mses = []
         for i in range(self.adapt_steps):
             acquired_x = self.get_input_with_highest_uncertainty()
-            self.fit(np.append(self.hf_X, acquired_x))
+            self.fit(np.vstack((self.hf_X, acquired_x)))
             mse = self.assess_mse(X_test, Y_test)
             mses.append(mse)
         hf_X_len_before = len(self.hf_X) - self.adapt_steps
@@ -335,6 +334,7 @@ class MultifidelityDataFusion(AbstractGP):
 
     def __plot(self, confidence_inteval_width=2, plot_lf=True, plot_hf=True, plot_pred=True, exceed_range_by=0):
         point_density = 1000
+        assert self.a is not None and self.b is not None, "plot borders must be defined"
         X = np.linspace(self.a, self.b * (1 + exceed_range_by),
                         int(point_density * (1 + exceed_range_by))).reshape(-1, 1)
         mean, uncertainty = self.predict(X.reshape(-1, 1))
