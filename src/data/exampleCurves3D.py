@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 
 np.random.seed(42)
 
-def get_example_data1():
+def get_curve1():
     def f_high(X):
         return np.array([
             np.sin(x[0])**2 + np.cos(x[1] + x[0]) for x in X
@@ -15,10 +15,10 @@ def get_example_data1():
     def f_low(X):
         return f_high(X) * np.abs(np.min(X))
 
-    return get_example_data(f_low, f_high)
+    return get_curve(f_low, f_high)
 
 
-def get_example_data(f_low, f_high):
+def get_curve(f_low, f_high):
 
     hf_size = 1
     lf_size = 80

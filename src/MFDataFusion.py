@@ -9,6 +9,7 @@ from scipy.optimize import fmin
 import time
 import sys
 import multiprocessing
+import concurrent.futures
 
 def timer(func):
     def wrapper(*args):
@@ -21,7 +22,7 @@ def timer(func):
 
 class MultifidelityDataFusion(AbstractGP):
 
-    def __init__(self, tau: float, n: int, input_dim: int, f_high: callable, adapt_steps: int = 0, f_low: callable = None, lf_X: np.ndarray = None, lf_Y: np.ndarray = None, lf_hf_adapt_ratio: int = 1,):
+    def __init__(self, tau: float, n: int, input_dim: int, f_high: callable, f_low: callable = None, lf_X: np.ndarray = None, lf_Y: np.ndarray = None, lf_hf_adapt_ratio: int = 1, optimize_restarts: int = 20, use_composite_kernel: bool = True, name: str = None):
         '''
         input: tau
             distance to neighbour points used in taylor expansion
@@ -35,15 +36,17 @@ class MultifidelityDataFusion(AbstractGP):
             if not provided, call self.lf_fit() to train a low-fidelity GP which will be used for low-fidelity predictions instead
         '''
         self.tau = tau
+        self.name = name
         self.n = n
         self.input_dim = input_dim
         self.__f_high_real = f_high
         self.f_low = f_low
-        self.adapt_steps = adapt_steps
         self.lf_hf_adapt_ratio = lf_hf_adapt_ratio
         self.a = self.b = None
         self.augm_iterator = EvenAugmentation(self.n, dim=input_dim)
         self.acquired_X = []
+        self.optimize_restarts = optimize_restarts
+        self.use_composite_kernel = use_composite_kernel
 
         lf_model_params_are_valid = (f_low is not None) ^ (
             (lf_X is not None) and (lf_Y is not None) and (lf_hf_adapt_ratio is not None))
@@ -79,32 +82,47 @@ class MultifidelityDataFusion(AbstractGP):
         # augment input data before prediction
         augmented_hf_X = self.__augment_Data(self.hf_X)
 
+        if self.use_composite_kernel:
+            kernel = self.NARGP_kernel() 
+        else: 
+            new_input_dims = self.input_dim + self.augm_iterator.new_entries_count()
+            kernel = GPy.kern.RBF(new_input_dims)
+
         self.hf_model = GPy.models.GPRegression(
             X=augmented_hf_X,
             Y=self.hf_Y,
-            kernel=self.NARGP_kernel(),
+            kernel=kernel,
             initialize=True
         )
         self.hf_model.optimize_restarts(num_restarts=6, verbose=False)  # ARD
 
-    def adapt(self, a=None, b=None, plot=None, X_test=None, Y_test=None, verbose=False):
+    def adapt(self, a=None, b=None, adapt_steps=10, plot=None, X_test=None, Y_test=None, verbose=False):
+        self.adapt_steps = adapt_steps
         if a is not None:
             self.a = a
         if b is not None:
             self.b = b
         assert a.shape == b.shape and len(a) == self.input_dim
         assert self.adapt_steps > 0
-        if plot == 'uncertainty':
+        if plot == 'u':
             assert self.input_dim == 1
             self.__adapt_plot_uncertainties(
-                X_test=X_test, Y_test=Y_test, verbose=verbose)
-        elif plot == 'mean':
+                X_test=X_test, Y_test=Y_test)
+        elif plot == 'm':
             assert self.input_dim == 1
             self.__adapt_plot_means(
-                X_test=X_test, Y_test=Y_test, verbose=verbose)
+                X_test=X_test, Y_test=Y_test)
+        elif plot =='mu' or plot == 'um':
+            assert self.input_dim == 1
+            self.__adapt_plot_combined(
+                X_test=X_test, Y_test=Y_test)
+        elif plot == 'e':
+            assert self.input_dim == 1
+            self.__adapt_plot_error(
+                X_test=X_test, Y_test=Y_test)
         elif plot is None:
             assert self.input_dim > 0
-            self.__adapt_no_plot(verbose=verbose)
+            self.__adapt_no_plot(X_test=X_test, Y_test=Y_test)
         else:
             raise Exception(
                 'invalid plot mode, use mean, uncertainty or False')
@@ -122,7 +140,6 @@ class MultifidelityDataFusion(AbstractGP):
             figsize=(20, 10))
         fig.suptitle(
             'Uncertainty development during the adaptation process')
-        log_mses = []
 
         # axs_flat = axs.flatten()
         for i in range(self.adapt_steps):
@@ -133,38 +150,80 @@ class MultifidelityDataFusion(AbstractGP):
             # todo: for steps = 1, flatten() will fail
             ax = axs.flatten()[i]
             ax.axes.xaxis.set_visible(False)
-            log_mse = self.assess_log_mse(X_test, Y_test)
-            log_mses.append(log_mse)
+            mse = self.assess_mse(X_test, Y_test)
             ax.set_title(
-                'log mse: {}, high-f. points: {}'.format(log_mse, len(self.hf_X)))
+                'mse: {}, high-f. points: {}'.format(mse, len(self.hf_X)))
             ax.plot(X, uncertainties)
             ax.plot(acquired_x.reshape(-1, 1), 0, 'rx')
             self.fit(np.append(self.hf_X, acquired_x))
 
-        # plot log_mse development during adapt process
-        plt.figure(2)
-        plt.title('logarithmic mean square error')
-        plt.xlabel('hf points')
-        plt.ylabel('log mse')
-        hf_X_len_before = len(self.hf_X) - self.adapt_steps
-        hf_X_len_now = len(self.hf_X)
-        plt.plot(
-            np.arange(hf_X_len_before, hf_X_len_now),
-            np.array(log_mses)
-        )
 
     def __adapt_plot_means(self, X_test=None, Y_test=None, verbose=False):
         X = np.linspace(self.a, self.b, 200).reshape(-1, 1)
         for i in range(self.adapt_steps):
             acquired_x = self.get_input_with_highest_uncertainty()
-            if verbose:
-                print('new x acquired: {}'.format(acquired_x))
             means, _ = self.predict(X)
             plt.plot(X, means, label='step {}'.format(i))
             self.fit(np.append(self.hf_X, acquired_x))
         plt.legend()
 
-    def __adapt_no_plot(self, verbose=False):
+    def __adapt_plot_combined(self, X_test=None, Y_test=None, verbose=False):
+        X = np.linspace(self.a, self.b, 200).reshape(-1, 1)
+        fig, axs = plt.subplots(
+            2,
+            self.adapt_steps,
+            sharey='row',
+            sharex=True,
+            figsize=(20, 10))
+
+        axs[0][0].set_ylabel('mean curves', size='large')
+        axs[1][0].set_ylabel('uncertainty curves', size='large')
+
+        for i in range(self.adapt_steps):
+            acquired_x = self.get_input_with_highest_uncertainty()
+            means, uncertainty = self.predict(X)
+            means = means.flatten()
+            uncertainty = uncertainty.flatten()
+
+            mean_ax = axs[0][i]
+            mean_ax.set_title('{} hf-points'.format(len(self.hf_X)))
+            mean_ax.plot(X, means, 'g')
+            mean_ax.plot(X, self.f_low(X), 'r')
+            mean_ax.plot(X, self.__f_high_real(X), 'b')
+            mean_ax.plot(self.hf_X, self.hf_Y, 'bx')
+            mean_ax.fill_between(X.flatten(),
+                    y1=means - 2 * uncertainty,
+                    y2=means + 2 * uncertainty,
+                    color=(0, 1, 0, .75)
+                    )
+
+            uncertainty_ax = axs[1][i]
+            uncertainty_ax.plot(X, uncertainty)
+            uncertainty_ax.plot(acquired_x.reshape(-1,1), 0, 'rx')
+
+            self.fit(np.append(self.hf_X, acquired_x))
+
+    def __adapt_plot_error(self, X_test=None, Y_test=None, yscale='log'):
+        mses = []
+        for i in range(self.adapt_steps):
+            acquired_x = self.get_input_with_highest_uncertainty()
+            self.fit(np.append(self.hf_X, acquired_x))
+            mse = self.assess_mse(X_test, Y_test)
+            mses.append(mse)
+        hf_X_len_before = len(self.hf_X) - self.adapt_steps
+        hf_X_len_now = len(self.hf_X)
+        plt.title('mean square error')
+        plt.xlabel('hf points')
+        plt.ylabel('mse')
+        plt.yscale(yscale)
+        plt.plot(
+            np.arange(hf_X_len_before, hf_X_len_now),
+            np.array(mses),
+            label=self.name
+        )
+        plt.legend()
+
+    def __adapt_no_plot(self, X_test=None, Y_test=None, verbose=False):
         for i in range(self.adapt_steps):
             acquired_x = self.get_input_with_highest_uncertainty()
             if verbose:
@@ -179,30 +238,41 @@ class MultifidelityDataFusion(AbstractGP):
         _, uncertainty = self.predict(X)
         return - uncertainty
 
-    @timer
-    def get_input_with_highest_uncertainty(self, restarts: int = 20):
+    def get_input_with_highest_uncertainty(self):
         best_xopt = np.zeros(self.input_dim)
         best_fopt = sys.maxsize
-        random_vector = np.random.uniform(size=(restarts, self.input_dim))
+        random_vector = np.random.uniform(size=(self.optimize_restarts, self.input_dim))
         start_positions = self.a + random_vector * (self.b - self.a)
 
         # TODO: parallelize
         for start in start_positions:
-            xopt, fopt, _, _, allvecs = fmin(
+            xopt, fopt, _, _, _ = fmin(
                 self.__acquisition_curve, start, full_output=True, disp=False)
             if fopt < best_fopt and np.all(self.a < xopt) and np.all(xopt < self.b):
                 best_fopt = fopt
                 best_xopt = xopt
         return best_xopt
 
-    # def parallel_stuff(self, restarts: int = 20):
-    #     best_xopt = 0
-    #     best_fopt = sys.maxsize
-    #     random_vector = np.random.uniform(size=(restarts, self.input_dim))
-    #     start_positions = self.a + random_vector * (self.b - self.a)
+    def get_input_with_highest_uncertainty_parrallel(self):
+        best_xopt = np.zeros(self.input_dim)
+        best_fopt = sys.maxsize
+        random_vector = np.random.uniform(size=(self.optimize_restarts, self.input_dim))
+        start_positions = self.a + random_vector * (self.b - self.a)
+        def f(x):
+            if x.ndim == 1:
+                X = x[None, :]
+            _, uncertainty = self.predict(X)
+            return - uncertainty
 
-    #     cpu_count = multiprocessing.cpu_count()
-    #     threads = [thread for thread in range(cpu_count)]
+        best_xopt = np.zeros(self.input_dim)
+        best_fopt = sys.maxsize
+        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+            outputs = executor.map(lambda sp: fmin(f, sp, full_output=True, disp=False), start_positions)
+            for xopt, fopt, _, _, _ in outputs:
+                if fopt < best_fopt and np.all(self.a < xopt) and np.all(xopt < self.b):
+                    best_fopt = fopt
+                    best_xopt = xopt
+            return best_xopt
 
     def __adapt_lf(self):
         X = np.linspace(self.a, self.b, 100).reshape(-1, 1)
@@ -244,13 +314,12 @@ class MultifidelityDataFusion(AbstractGP):
     def plot_forecast(self, forecast_range=.5):
         self.__plot(exceed_range_by=forecast_range)
 
-    def assess_log_mse(self, X_test, y_test):
+    def assess_mse(self, X_test, y_test):
         assert X_test.shape[1] == self.input_dim
         assert y_test.shape[1] == 1
         predictions = self.predict_means(X_test)
         mse = mean_squared_error(y_true=y_test, y_pred=predictions)
-        log_mse = np.log2(mse)
-        return np.round(log_mse, 4)
+        return np.round(mse, 4)
 
     def NARGP_kernel(self, kern_class1=GPy.kern.RBF, kern_class2=GPy.kern.RBF, kern_class3=GPy.kern.RBF):
         std_input_dim = self.input_dim
@@ -265,12 +334,12 @@ class MultifidelityDataFusion(AbstractGP):
         return kern1 * kern2 + kern3
 
     def __plot(self, confidence_inteval_width=2, plot_lf=True, plot_hf=True, plot_pred=True, exceed_range_by=0):
-        point_density = 500
+        point_density = 1000
         X = np.linspace(self.a, self.b * (1 + exceed_range_by),
                         int(point_density * (1 + exceed_range_by))).reshape(-1, 1)
-        pred_mean, pred_variance = self.predict(X.reshape(-1, 1))
-        pred_mean = pred_mean.flatten()
-        pred_variance = pred_variance.flatten()
+        mean, uncertainty = self.predict(X.reshape(-1, 1))
+        mean = mean.flatten()
+        uncertainty = uncertainty.flatten()
 
         if (not self.data_driven_lf_approach):
             self.lf_X = np.linspace(self.a, self.b, 50).reshape(-1, 1)
@@ -278,7 +347,7 @@ class MultifidelityDataFusion(AbstractGP):
 
         lf_color, hf_color, pred_color = 'r', 'b', 'g'
 
-        plt.figure(3)
+        plt.figure()
         if plot_lf:
             # plot low fidelity
             plt.plot(self.lf_X, self.lf_Y, lf_color +
@@ -295,14 +364,16 @@ class MultifidelityDataFusion(AbstractGP):
 
         if plot_pred:
             # plot prediction
-            plt.plot(X, pred_mean, pred_color, label='prediction')
+            plt.plot(X, mean, pred_color, label='prediction')
             plt.fill_between(X.flatten(),
-                             y1=pred_mean - confidence_inteval_width * pred_variance,
-                             y2=pred_mean + confidence_inteval_width * pred_variance,
+                             y1=mean - confidence_inteval_width * uncertainty,
+                             y2=mean + confidence_inteval_width * uncertainty,
                              color=(0, 1, 0, .75)
                              )
 
         plt.legend()
+        if self.name:
+            plt.title(self.name)
 
     def __augment_Data(self, X):
         assert X.shape == (len(X), self.input_dim)
