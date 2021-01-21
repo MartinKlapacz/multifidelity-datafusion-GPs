@@ -6,21 +6,21 @@ import matplotlib.pyplot as plt
 
 np.random.seed(42)
 
-def get_curve1():
+def get_curve1(num_hf):
     def f_high(X):
         return np.array([
             np.sin(x[0])**2 + np.cos(x[1] + x[0]) for x in X
         ])[:, None]
 
     def f_low(X):
-        return f_high(X) * np.abs(np.min(X))
+        return f_high(X) * 2
 
-    return get_curve(f_low, f_high)
+    return get_curve(f_low, f_high, num_hf)
 
 
-def get_curve(f_low, f_high):
+def get_curve(f_low, f_high, num_hf):
 
-    hf_size = 1
+    hf_size = num_hf
     lf_size = 80
     N = lf_size + hf_size
 

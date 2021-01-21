@@ -7,37 +7,37 @@ import matplotlib.pyplot as plt
 np.random.seed(42)
 
 
-def get_curve1():
+def get_curve1(num_hf):
     def f_low(t): return np.sin(8 * pi * t)
     def f_high(t): return np.sin(8 * pi * t)**2
-    return get_curve(f_low, f_high)
+    return get_curve(f_low, f_high, num_hf)
 
 
-def get_curve2():
+def get_curve2(num_hf):
     def f_low(t): return np.sin(8 * pi * t)
     def f_high(t): return t**2 * f_low(t)**2
-    return get_curve(f_low, f_high)
+    return get_curve(f_low, f_high, num_hf)
 
 
-def get_curve3():
+def get_curve3(num_hf):
     def f_low(t): return np.sin(8 * pi * t)
     def f_high(t): return t**2 * np.sin(8 * pi * t + pi / 10)**2
-    return get_curve(f_low, f_high)
+    return get_curve(f_low, f_high, num_hf)
 
 
-def get_curve4():
+def get_curve4(num_hf):
     def f_low(t): return np.sin(8 * pi * t)
     def f_high(t): return (t - 1.41) * f_low(t)**2
-    return get_curve(f_low, f_high)
+    return get_curve(f_low, f_high, num_hf)
 
 
-def get_curve5():
+def get_curve5(num_hf):
     def f_low(t): return np.sin(8 * pi * t)
     def f_high(t): return t**2 + np.sin(8 * pi * t + pi/10)
-    return get_curve(f_low, f_high)
+    return get_curve(f_low, f_high, num_hf)
 
 
-def get_discontinuity1():
+def get_discontinuity1(num_hf):
     # linear relation
     def f_high(t): 
         if t < .3:
@@ -48,9 +48,9 @@ def get_discontinuity1():
             return np.sin(49 * t) + 6
     def f_low(t):
         return 2 * f_high(t) + 3
-    return get_curve(f_low, f_high)
+    return get_curve(f_low, f_high, num_hf)
 
-def get_discontinuity2():
+def get_discontinuity2(num_hf):
     # simple nonlinear relation
     def f_high(t): 
         if t < .3:
@@ -61,10 +61,10 @@ def get_discontinuity2():
             return np.sin(49 * t) + 6
     def f_low(t):
         return 2 * f_high(t) + t
-    return get_curve(f_low, f_high)
+    return get_curve(f_low, f_high, num_hf)
 
 
-def get_discontinuity3():
+def get_discontinuity3(num_hf):
     # quadratic nonlinearity
     def f_high(t): 
         if t < .3:
@@ -75,9 +75,9 @@ def get_discontinuity3():
             return np.sin(49 * t) + 6
     def f_low(t):
         return 2 * f_high(t) + t**2
-    return get_curve(f_low, f_high)
+    return get_curve(f_low, f_high, num_hf)
 
-def get_discontinuity4():
+def get_discontinuity4(num_hf):
     # highly nonlinear -> bad performance
     def f_high(t): 
         if t < .3:
@@ -88,9 +88,9 @@ def get_discontinuity4():
             return np.sin(49 * t) + 6
     def f_low(t):
         return 2 * f_high(t) * t**2 + np.sin(1 / (t+1))
-    return get_curve(f_low, f_high)
+    return get_curve(f_low, f_high, num_hf)
 
-def get_wide_discontinuity():
+def get_wide_discontinuity(num_hf):
     # nonlinear relation
     def f_high(t): 
         if t < .3:
@@ -101,15 +101,15 @@ def get_wide_discontinuity():
             return np.sin(49 * t) + 6
     def f_low(t):
         return 2 * f_high(t) + t
-    return get_curve(f_low, f_high)
+    return get_curve(f_low, f_high, num_hf)
 
 
 
-def get_curve(f_low, f_high):
+def get_curve(f_low, f_high, num_hf):
     f_low = np.vectorize(f_low)
     f_high = np.vectorize(f_high)
 
-    hf_size = 3
+    hf_size = num_hf
     lf_size = 80
     N = lf_size + hf_size
 
