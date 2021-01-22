@@ -76,8 +76,8 @@ class MultifidelityDataFusion(AbstractGP):
 
     def fit(self, hf_X):
         """fit the high-fidelity model"""
-        assert hf_X.ndim == 2
-        assert hf_X.shape[1] == self.input_dim
+        assert hf_X.ndim == 2, "invalid input shape"
+        assert hf_X.shape[1] == self.input_dim, "invalid input dim"
         self.hf_X = hf_X
 
         # compute corresponding exact y-values
@@ -100,8 +100,9 @@ class MultifidelityDataFusion(AbstractGP):
 
         # different plot modes available
         adapt_modes = {
-            'u': lambda: self.__adapt_plot_uncertainties(X_test=X_test, Y_test=Y_test),
-            'm': lambda: self.__adapt_plot_means(X_test=X_test, Y_test=Y_test),
+            'u':  lambda: self.__adapt_plot_uncertainties(X_test=X_test, Y_test=Y_test),
+            'm':  lambda: self.__adapt_plot_means(X_test=X_test, Y_test=Y_test),
+            'e':  lambda: self.__adapt_plot_error(X_test=X_test, Y_test=Y_test),
             'um': lambda: self.__adapt_plot_combined(X_test=X_test, Y_test=Y_test),
             'mu': lambda: self.__adapt_plot_combined(X_test=X_test, Y_test=Y_test),
             None: lambda: self.__adapt_no_plot(X_test=X_test, Y_test=Y_test),
@@ -111,7 +112,7 @@ class MultifidelityDataFusion(AbstractGP):
         adapt_modes.get(plot)()
 
     def __adapt_plot_uncertainties(self, X_test=None, Y_test=None, verbose=False):
-        assert self.input_dim == 1
+        assert self.input_dim == 1, "only 2d plotting possible"
         # define input space X
         X = np.linspace(self.lower_bound, self.upper_bound, 200).reshape(-1, 1)
         # prepare subplotting
@@ -138,8 +139,8 @@ class MultifidelityDataFusion(AbstractGP):
             self.fit(np.vstack((self.hf_X, acquired_x)))
 
     def __adapt_plot_means(self, X_test=None, Y_test=None, verbose=False):
-        assert self.input_dim == 1
-        X = np.linspace(self.lower_bound, self.b, 200).reshape(-1, 1)
+        assert self.input_dim == 1, "only 2d plotting possible"
+        X = np.linspace(self.lower_bound, self.upper_bound, 200).reshape(-1, 1)
         for i in range(self.adapt_steps):
             acquired_x = self.get_input_with_highest_uncertainty()
             means, _ = self.predict(X)
@@ -148,7 +149,7 @@ class MultifidelityDataFusion(AbstractGP):
         plt.legend()
 
     def __adapt_plot_combined(self, X_test=None, Y_test=None, verbose=False):
-        assert self.input_dim == 1
+        assert self.input_dim == 1, "only 2d plotting possible"
         X = np.linspace(self.lower_bound, self.upper_bound, 200).reshape(-1, 1)
         fig, axs = plt.subplots(
             2,
@@ -262,7 +263,7 @@ class MultifidelityDataFusion(AbstractGP):
             return best_xopt
 
     def __adapt_lf(self):
-        X = np.linspace(self.lower_bound, self.b, 100).reshape(-1, 1)
+        X = np.linspace(self.lower_bound, self.upper_bound, 100).reshape(-1, 1)
         for i in range(self.adapt_steps * self.lf_hf_adapt_ratio):
             uncertainties = self.lf_model.predict(X)[1]
             maxIndex = np.argmax(uncertainties)
@@ -314,11 +315,16 @@ class MultifidelityDataFusion(AbstractGP):
         kern2 = kern_class2(std_input_dim, active_dims=std_indezes)
         kern3 = kern_class3(std_input_dim, active_dims=std_indezes)
         return kern1 * kern2 + kern3
-
+    
     def __plot(self, confidence_inteval_width=2, plot_lf=True, plot_hf=True, plot_pred=True, exceed_range_by=0):
+        if (self.input_dim == 1):
+            self.__plot1D(confidence_inteval_width, plot_lf, plot_hf, plot_pred, exceed_range_by)
+        else:
+            self.__plot2D(plot_lf, plot_hf, plot_pred)
+
+    def __plot1D(self, confidence_inteval_width=2, plot_lf=True, plot_hf=True, plot_pred=True, exceed_range_by=0):
         point_density = 1000
-        assert self.lower_bound is not None and self.b is not None, "plot borders must be defined"
-        X = np.linspace(self.lower_bound, self.b * (1 + exceed_range_by),
+        X = np.linspace(self.lower_bound, self.upper_bound * (1 + exceed_range_by),
                         int(point_density * (1 + exceed_range_by))).reshape(-1, 1)
         mean, uncertainty = self.predict(X.reshape(-1, 1))
         mean = mean.flatten()
@@ -326,7 +332,7 @@ class MultifidelityDataFusion(AbstractGP):
 
         if (not self.data_driven_lf_approach):
             self.lf_X = np.linspace(
-                self.lower_bound, self.b, 50).reshape(-1, 1)
+                self.lower_bound, self.upper_bound, 50).reshape(-1, 1)
             self.lf_Y = self.__lf_mean_predict(self.lf_X)
 
         lf_color, hf_color, pred_color = 'r', 'b', 'g'
@@ -358,6 +364,13 @@ class MultifidelityDataFusion(AbstractGP):
         plt.legend()
         if self.name:
             plt.title(self.name)
+
+    def __plot2D(self, plot_lf=True, plot_hf=True, plot_pred=True):
+        density = 100
+        X = np.linspace(self.lower_bound[0], self.upper_bound[1], density)
+        Y = np.linspace(self.lower_bound[0], self.upper_bound[1], density)
+        X, Y = np.meshgrid(X, Y)
+        
 
     def __augment_Data(self, X):
         assert X.shape == (len(X), self.input_dim)

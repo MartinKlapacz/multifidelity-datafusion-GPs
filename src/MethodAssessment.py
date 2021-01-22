@@ -16,10 +16,10 @@ class MethodAssessment:
         for model in self.models:
             model.fit(hf_X=X_train)
 
-    def adapt_models(self, a, b, adapt_steps, plot=None):
+    def adapt_models(self, adapt_steps, plot=None):
         assert plot in [None, 'e']
         for model in self.models:
-            model.adapt(a, b, adapt_steps, plot=plot,
+            model.adapt(adapt_steps, plot=plot,
                               X_test=self.X_test, 
                               Y_test=self.y_test)
 
@@ -31,8 +31,8 @@ class MethodAssessment:
         for model in self.models:
             model.plot_forecast(forecast_range)
 
-    def mse(self):
-        mses = []
+    def mses(self):
+        mses = {}
         for model in self.models:
-            mses.append(model.assess_mse(self.X_test, self.y_test))
+            mses[model.name] = model.assess_mse(self.X_test, self.y_test)
         return mses
