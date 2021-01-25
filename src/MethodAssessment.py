@@ -4,13 +4,13 @@ import matplotlib.pyplot as plt
 
 
 class MethodAssessment:
-    def __init__(self, models, X_test, y_test):
+    def __init__(self, models, X_test, Y_test):
         assert type(models) is list
         for model in models:
             assert isinstance(model, MultifidelityDataFusion)
         self.models = models
         self.X_test = X_test
-        self.y_test = y_test
+        self.Y_test = Y_test
 
     def fit_models(self, X_train):
         for model in self.models:
@@ -21,7 +21,7 @@ class MethodAssessment:
         for model in self.models:
             model.adapt(adapt_steps, plot=plot,
                               X_test=self.X_test, 
-                              Y_test=self.y_test)
+                              Y_test=self.Y_test)
 
     def plot(self):
         for model in self.models:
@@ -34,5 +34,5 @@ class MethodAssessment:
     def mses(self):
         mses = {}
         for model in self.models:
-            mses[model.name] = model.assess_mse(self.X_test, self.y_test)
+            mses[model.name] = model.assess_mse(self.X_test, self.Y_test)
         return mses

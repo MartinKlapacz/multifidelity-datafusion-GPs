@@ -11,7 +11,7 @@ import sys
 import multiprocessing
 import concurrent.futures
 from scipydirect import minimize
-
+from DIRECT import solve
 
 def timer(func):
     def wrapper(*args):
@@ -122,6 +122,18 @@ class MultifidelityDataFusion(AbstractGP):
         assert plot in adapt_modes.keys(), 'invalid plot mode'
         adapt_modes.get(plot)()
 
+    def plot_uncertainties_2D(self):
+        density = 60
+        X1 = np.linspace(self.lower_bound[0], self.upper_bound[1], density)
+        X2 = np.linspace(self.lower_bound[0], self.upper_bound[1], density)
+        X1, X2 = np.meshgrid(X1, X2)
+        X = np.array((X1.flatten(), X2.flatten())).T
+        _, uncertainties = self.predict(X)
+        ax = plt.gca(projection='3d')
+        ax.scatter(X1, X2, uncertainties)
+        ax.scatter(self.hf_X[:,0], self.hf_X[:,1], 0)
+        plt.show()
+
     def __adapt_plot_uncertainties(self, X_test=None, Y_test=None, verbose=False):
         assert self.input_dim == 1, "only 2d plotting possible"
         # define input space X
@@ -224,22 +236,16 @@ class MultifidelityDataFusion(AbstractGP):
             assert new_hf_X.shape == (len(self.hf_X) + 1, self.input_dim)
             self.fit(new_hf_X)
 
-    def __acquisition_curve(self, x):
-        if x.ndim == 1:
-            x = x[:, None]
-        _, uncertainty = self.predict(x)
+    def __acquisition_curve(self, x1, foo):
+        _, uncertainty = self.predict(x1[None,:])
         return - uncertainty[:, None]
 
     def get_input_with_highest_uncertainty(self):
         # negative uncertainty curve
-        # def acquisition_curve(x): return - self.predict(x)[1]
         bounds = np.hstack((self.lower_bound[:, None], self.upper_bound[:, None]))
         # maximizing uncertainty is equal to minimizing negative uncertainty curve
-        t = time.time()
-        res = minimize(self.__acquisition_curve, bounds, maxT=50, )
-
-        print(time.time() - t)
-        return res.x
+        x, _, _ = solve(self.__acquisition_curve, self.lower_bound, self.upper_bound, maxT=50)
+        return x
 
     def __adapt_lf(self):
         X = np.linspace(self.lower_bound, self.upper_bound, 100).reshape(-1, 1)
@@ -361,7 +367,6 @@ class MultifidelityDataFusion(AbstractGP):
             ax.scatter(X1, X2, lf_y)
         if plot_hf:
             ax.scatter(X1, X2, hf_y)
-        plt.show()
 
 
     def __augment_Data(self, X):
