@@ -9,35 +9,24 @@ np.random.seed(42)
 def get_curve1(num_lf, num_hf):
     def f_high(X):
         return np.array([
-            np.sin(x[0])**2 + np.cos(x[1] + x[0]) for x in X
+            np.sin(10 * x[0])**2 + np.cos(10 * x[1]) for x in X
         ])[:, None]
 
     def f_low(X):
-        return 1.5 * f_high(X)
-
+        return 1.5 * f_high(X) + 3
     return get_curve(f_low, f_high, num_lf, num_hf)
 
 def get_curve2(num_lf, num_hf):
     def f_high(X):
         return np.array([
-            np.sin(x[0])**2 + np.cos(x[1]**2 + x[0]) for x in X
+            np.sin(2 * x[0])**2 + np.cos(2 * x[1]) for x in X
         ])[:, None]
 
     def f_low(X):
-        return 1.5 * f_high(X) + 3
-
+        return 1.5 * f_high(X)*f_high(X)* + 3
     return get_curve(f_low, f_high, num_lf, num_hf)
 
-def get_curve3(num_lf, num_hf):
-    def f_high(X):
-        return np.array([
-            np.sin(x[0])**2 + np.cos(x[1]**2 + x[0]) for x in X
-        ])[:, None]
 
-    def f_low(X):
-        return f_high(X) * f_high(X) + 3
-
-    return get_curve(f_low, f_high, num_lf, num_hf)
 
 
 def get_curve(f_low, f_high, num_lf, num_hf):
@@ -70,9 +59,12 @@ def get_curve(f_low, f_high, num_lf, num_hf):
 
     return X_train_hf, X_train_lf, y_train_lf, f_high, f_low, X_test, y_test
 
-# plt.figure()
-# ax = plt.gca(projection='3d')
-# print(y_train_lf)
-# ax.scatter(X_train_lf[:,0], X_train_lf[:,1], y_train_lf)
-# # ax.scatter(X_train_hf[:,0], X_train_hf[:,1], f_high(X_train_hf))
-# plt.show()
+
+if __name__ == '__main__':
+    X_train_hf, X_train_lf, y_train_lf, f_high, f_low, X_test, y_test = get_curve2(800, 800)
+    plt.figure()
+    ax = plt.gca(projection='3d')
+    print(y_train_lf)
+    ax.scatter(X_train_lf[:,0], X_train_lf[:,1], y_train_lf)
+    ax.scatter(X_train_hf[:,0], X_train_hf[:,1], f_high(X_train_hf))
+    plt.show()
