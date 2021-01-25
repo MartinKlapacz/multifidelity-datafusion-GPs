@@ -220,7 +220,7 @@ class MultifidelityDataFusion(AbstractGP):
     def __adapt_no_plot(self, X_test=None, Y_test=None, verbose=False):
         for i in range(self.adapt_steps):
             acquired_x = self.get_input_with_highest_uncertainty()
-            new_hf_X = np.append(self.hf_X, [acquired_x], axis=0)
+            new_hf_X = np.vstack((self.hf_X, acquired_x))
             assert new_hf_X.shape == (len(self.hf_X) + 1, self.input_dim)
             self.fit(new_hf_X)
 
@@ -236,7 +236,7 @@ class MultifidelityDataFusion(AbstractGP):
         bounds = np.hstack((self.lower_bound[:, None], self.upper_bound[:, None]))
         # maximizing uncertainty is equal to minimizing negative uncertainty curve
         t = time.time()
-        res = minimize(self.__acquisition_curve, bounds, maxT=50)
+        res = minimize(self.__acquisition_curve, bounds, maxT=50, )
 
         print(time.time() - t)
         return res.x
@@ -267,7 +267,7 @@ class MultifidelityDataFusion(AbstractGP):
         return self.hf_model.predict(X_test)
 
     def plot(self):
-        assert self.input_dim == 1, 'data must be 2 dimensional in order to be plotted'
+        assert self.input_dim <= 2, 'data must be 1 or 2 dimensional'
         self.__plot()
 
     def plot_forecast(self, forecast_range=.5):
@@ -345,10 +345,24 @@ class MultifidelityDataFusion(AbstractGP):
             plt.title(self.name)
 
     def __plot2D(self, plot_lf=True, plot_hf=True, plot_pred=True):
-        density = 100
-        X = np.linspace(self.lower_bound[0], self.upper_bound[1], density)
-        Y = np.linspace(self.lower_bound[0], self.upper_bound[1], density)
-        X, Y = np.meshgrid(X, Y)
+        density = 35
+        X1 = np.linspace(self.lower_bound[0], self.upper_bound[1], density)
+        X2 = np.linspace(self.lower_bound[0], self.upper_bound[1], density)
+        X1, X2 = np.meshgrid(X1, X2)
+        X = np.array((X1.flatten(), X2.flatten())).T
+        preds, _ = self.predict(X)
+        lf_y = self.f_low(X)
+        hf_y = self.f_exact(X)
+
+        ax = plt.gca(projection='3d')
+        if plot_pred:
+            ax.scatter(X1, X2, preds)
+        if plot_lf:
+            ax.scatter(X1, X2, lf_y)
+        if plot_hf:
+            ax.scatter(X1, X2, hf_y)
+        plt.show()
+
 
     def __augment_Data(self, X):
         """augment the hf-inputs with corresponding lf-predictions"""
