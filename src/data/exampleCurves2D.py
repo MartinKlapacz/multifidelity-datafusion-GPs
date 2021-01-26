@@ -23,7 +23,7 @@ def get_curve2(num_lf, num_hf):
         ])[:, None]
 
     def f_low(X):
-        return 1.5 * f_high(X)*f_high(X)* + 3
+        return 1.5 * f_high(X)*f_high(X) + 3
     return get_curve(f_low, f_high, num_lf, num_hf)
 
 

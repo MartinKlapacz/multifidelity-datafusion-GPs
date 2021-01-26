@@ -244,7 +244,7 @@ class MultifidelityDataFusion(AbstractGP):
         # negative uncertainty curve
         bounds = np.hstack((self.lower_bound[:, None], self.upper_bound[:, None]))
         # maximizing uncertainty is equal to minimizing negative uncertainty curve
-        x, _, _ = solve(self.__acquisition_curve, self.lower_bound, self.upper_bound, maxT=50)
+        x, _, _ = solve(self.__acquisition_curve, self.lower_bound, self.upper_bound, maxT=50, algmethod=1)
         return x
 
     def __adapt_lf(self):
