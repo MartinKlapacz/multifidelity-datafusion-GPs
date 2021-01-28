@@ -21,9 +21,9 @@ def test_adaptation_improves_mse():
     )
 
     model.fit(X_train_hf)
-    mse_before = model.assess_mse(X_test, y_test)
+    mse_before = model.get_mse(X_test, y_test)
     model.adapt(5)
-    mse_after = model.assess_mse(X_test, y_test)
+    mse_after = model.get_mse(X_test, y_test)
     assert mse_after < mse_before
 
 def test_model_with_adapted_input_better_than_model_with_random_input():
@@ -41,7 +41,7 @@ def test_model_with_adapted_input_better_than_model_with_random_input():
     )
     model1.fit(X_train_hf)
     model1.adapt(15)
-    mse1 = model1.assess_mse(X_test, y_test)
+    mse1 = model1.get_mse(X_test, y_test)
 
     X_train_hf, X_train_lf, y_train_lf, f_high, f_low, X_test, y_test = ex2D.get_curve4(num_hf=20)
     model2 = MultifidelityDataFusion(
@@ -56,5 +56,5 @@ def test_model_with_adapted_input_better_than_model_with_random_input():
         upper_bound=np.ones(1),
     )
     model2.fit(X_train_hf)
-    mse2 = model2.assess_mse(X_test, y_test)
+    mse2 = model2.get_mse(X_test, y_test)
     assert mse1 < mse2
