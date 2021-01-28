@@ -120,19 +120,21 @@ class MultifidelityDataFusion(AbstractGP):
     def adapt(self, adapt_steps, plot_mode=None, X_test=None, Y_test=None):
         """optimized training of the MFDF model using adapation"""
         self.adapt_steps = adapt_steps
+        self.X_test = X_test
+        self.Y_test = Y_test
 
         # there are different plot modes available
         adapt_mode_dict = {
-            'u':  lambda X, Y: self.__adapt_and_plot(X, Y, plot_uncertainties=True),
-            'm':  lambda X, Y: self.__adapt_and_plot(X, Y, plot_means=True),
-            'e':  lambda X, Y: self.__adapt_and_plot(X, Y, plot_error=True),
-            'um': lambda X, Y: self.__adapt_and_plot(X, Y, plot_means=True, plot_uncertainties=True),
-            'mu': lambda X, Y: self.__adapt_and_plot(X, Y, plot_means=True, plot_uncertainties=True),
-            None: lambda X, Y: self.__adapt_and_plot(X, Y),
+            'u':  lambda: self.__adapt_and_plot(plot_uncertainties=True),
+            'm':  lambda: self.__adapt_and_plot(plot_means=True),
+            'e':  lambda: self.__adapt_and_plot(plot_error=True),
+            'um': lambda: self.__adapt_and_plot(plot_means=True, plot_uncertainties=True),
+            'mu': lambda: self.__adapt_and_plot(plot_means=True, plot_uncertainties=True),
+            None: lambda: self.__adapt_and_plot(),
         }
 
         assert plot_mode in adapt_mode_dict.keys(), "invalid plot mode"
-        adapt_mode_dict.get(plot_mode)(X_test, Y_test)
+        adapt_mode_dict.get(plot_mode)()
 
     def __adapt_lf(self):
         X = np.linspace(self.lower_bound, self.upper_bound, 100).reshape(-1, 1)
@@ -203,7 +205,7 @@ class MultifidelityDataFusion(AbstractGP):
         return augmented_X
 
     # adaptation
-    def __adapt_and_plot(self, X_test, Y_test, plot_means: bool=False, plot_uncertainties: bool=False, plot_error: bool=False):
+    def __adapt_and_plot(self, plot_means: bool=False, plot_uncertainties: bool=False, plot_error: bool=False):
         X = np.linspace(self.lower_bound, self.upper_bound, 200)
         mses = []
 
@@ -220,8 +222,8 @@ class MultifidelityDataFusion(AbstractGP):
             nrows = int(np.ceil(np.sqrt(self.adapt_steps)))
             ncols = int(np.ceil(self.adapt_steps / nrows))
 
-        if plot_means or plot_error or plot_uncertainties:
-            fig, axs = plt.subplots(
+        if plot_means or plot_uncertainties:
+            _, axs = plt.subplots(
                 nrows,
                 ncols,
                 sharey='row',
@@ -259,7 +261,7 @@ class MultifidelityDataFusion(AbstractGP):
             elif plot_uncertainties:
                 ax = axs.flatten()[i] if self.adapt_steps > 1 else axs
                 ax.axes.xaxis.set_visible(False)
-                mse = np.round(self.get_mse(X_test, Y_test), 4)
+                mse = np.round(self.get_mse(self.X_test, self.Y_test), 4)
                 ax.set_title('mse: {}, hf. points: {}'.format(mse, len(self.hf_X)))
                 ax.plot(X, uncertainties)
                 ax.plot(acquired_x, 0, 'rx')
@@ -267,7 +269,7 @@ class MultifidelityDataFusion(AbstractGP):
                 axs.plot(X, means, label='step {}'.format(i))
                 plt.legend()
             elif plot_error:
-                mse = self.get_mse(X_test, Y_test)
+                mse = self.get_mse(self.X_test, self.Y_test)
                 mses.append(mse)
 
             self.fit(new_hf_X)
@@ -289,7 +291,6 @@ class MultifidelityDataFusion(AbstractGP):
             Y = means if plot_means else uncertainties
             plt.plot(X, Y, label='step {}'.format(i))
             plt.legend()
-
 
     # plotting
 
