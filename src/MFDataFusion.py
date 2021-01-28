@@ -10,7 +10,7 @@ import time
 import sys
 import multiprocessing
 import concurrent.futures
-
+from DIRECT import solve
 
 def timer(func):
     def wrapper(*args):
@@ -24,8 +24,11 @@ def timer(func):
 
 class MultifidelityDataFusion(AbstractGP):
 
-    def __init__(self, name: str, input_dim: int,  num_derivatives: int, tau: float, f_high: callable, lower_bound: float = np.zeros(1), upper_bound: float = np.ones(1), f_low: callable = None, lf_X: np.ndarray = None, lf_Y: np.ndarray = None, lf_hf_adapt_ratio: int = 1, use_composite_kernel: bool = True,):
+    def __init__(self, name: str, input_dim: int, num_derivatives: int, tau: float, f_high: callable,
+                 lower_bound: float = None, upper_bound: float = None, f_low: callable = None, lf_X: np.ndarray = None,
+                 lf_Y: np.ndarray = None, lf_hf_adapt_ratio: int = 1, use_composite_kernel: bool = True,):
 
+        # model paramters
         self.name = name
         self.input_dim = input_dim
         self.num_derivatives = num_derivatives
@@ -33,10 +36,17 @@ class MultifidelityDataFusion(AbstractGP):
         self.f_exact = f_high
         self.f_low = f_low
         self.lf_hf_adapt_ratio = lf_hf_adapt_ratio
-        self.lower_bound = lower_bound
-        self.upper_bound = upper_bound
-        self.augm_iterator = EvenAugmentation(
-            self.num_derivatives, dim=input_dim)
+
+        # data bounds
+        if lower_bound is None and upper_bound is None:
+            self.lower_bound = np.zeros(input_dim)
+            self.upper_bound = np.ones(input_dim)
+        else:
+            self.lower_bound = lower_bound
+            self.upper_bound = upper_bound
+
+        # augmentation pattern
+        self.augm_iterator = EvenAugmentation(self.num_derivatives, dim=input_dim)
         self.optimize_restarts = 10
 
         self.__initialize_kernel(use_composite_kernel)
@@ -91,7 +101,15 @@ class MultifidelityDataFusion(AbstractGP):
             kernel=self.kernel,
             initialize=True
         )
-        self.hf_model.optimize_restarts(num_restarts=6, verbose=False)  # ARD
+        # self.hf_model.optimize_restarts(num_restarts=6, verbose=False)  # ARD
+        # Following are the ARD steps
+        num_restarts = 6
+        self.hf_model[".*Gaussian_noise"] = self.hf_model.Y.var()*0.01
+        self.hf_model[".*Gaussian_noise"].fix()
+        self.hf_model.optimize(max_iters = 500)
+        self.hf_model[".*Gaussian_noise"].unfix()
+        self.hf_model[".*Gaussian_noise"].constrain_positive()
+        self.hf_model.optimize_restarts(num_restarts, optimizer = "bfgs",  max_iters = 1000, verbose=False)
 
     def adapt(self, adapt_steps, plot=None, X_test=None, Y_test=None):
         """optimized training of the MFDF model using adapation"""
@@ -100,9 +118,9 @@ class MultifidelityDataFusion(AbstractGP):
 
         # different plot modes available
         adapt_modes = {
-            'u':  lambda: self.__adapt_plot_uncertainties(X_test=X_test, Y_test=Y_test),
-            'm':  lambda: self.__adapt_plot_means(X_test=X_test, Y_test=Y_test),
-            'e':  lambda: self.__adapt_plot_error(X_test=X_test, Y_test=Y_test),
+            'u': lambda: self.__adapt_plot_uncertainties(X_test=X_test, Y_test=Y_test),
+            'm': lambda: self.__adapt_plot_means(X_test=X_test, Y_test=Y_test),
+            'e': lambda: self.__adapt_plot_error(X_test=X_test, Y_test=Y_test),
             'um': lambda: self.__adapt_plot_combined(X_test=X_test, Y_test=Y_test),
             'mu': lambda: self.__adapt_plot_combined(X_test=X_test, Y_test=Y_test),
             None: lambda: self.__adapt_no_plot(X_test=X_test, Y_test=Y_test),
@@ -110,6 +128,18 @@ class MultifidelityDataFusion(AbstractGP):
 
         assert plot in adapt_modes.keys(), 'invalid plot mode'
         adapt_modes.get(plot)()
+
+    def plot_uncertainties_2D(self):
+        density = 60
+        X1 = np.linspace(self.lower_bound[0], self.upper_bound[1], density)
+        X2 = np.linspace(self.lower_bound[0], self.upper_bound[1], density)
+        X1, X2 = np.meshgrid(X1, X2)
+        X = np.array((X1.flatten(), X2.flatten())).T
+        _, uncertainties = self.predict(X)
+        ax = plt.gca(projection='3d')
+        ax.scatter(X1, X2, uncertainties)
+        ax.scatter(self.hf_X[:,0], self.hf_X[:,1], 0)
+        plt.show()
 
     def __adapt_plot_uncertainties(self, X_test=None, Y_test=None, verbose=False):
         assert self.input_dim == 1, "only 2d plotting possible"
@@ -209,58 +239,22 @@ class MultifidelityDataFusion(AbstractGP):
     def __adapt_no_plot(self, X_test=None, Y_test=None, verbose=False):
         for i in range(self.adapt_steps):
             acquired_x = self.get_input_with_highest_uncertainty()
-            new_hf_X = np.append(self.hf_X, [acquired_x], axis=0)
+            new_hf_X = np.vstack((self.hf_X, acquired_x))
             assert new_hf_X.shape == (len(self.hf_X) + 1, self.input_dim)
+            # self.plot_uncertainties_2D()
+            # plt.show()
             self.fit(new_hf_X)
 
-    def __acquisition_curve(self, x):
-        if x.ndim == 1:
-            X = x[None, :]
-        _, uncertainty = self.predict(X)
-        return - uncertainty
+    def __acquisition_curve(self, x1, foo):
+        _, uncertainty = self.predict(x1[None,:])
+        return - uncertainty[:, None]
 
     def get_input_with_highest_uncertainty(self):
-        best_xopt = np.zeros(self.input_dim)
-        best_fopt = sys.maxsize
-        random_vector = np.random.uniform(
-            size=(self.optimize_restarts, self.input_dim))
-        start_positions = self.lower_bound + random_vector * \
-            (self.upper_bound - self.lower_bound)
-
-        # TODO: parallelize
-        for start in start_positions:
-            xopt, fopt, _, _, _ = fmin(
-                self.__acquisition_curve, start, full_output=True, disp=False)
-            if fopt < best_fopt and np.all(self.lower_bound < xopt) and np.all(xopt < self.upper_bound):
-                best_fopt = fopt
-                best_xopt = xopt
-        assert best_xopt.shape == (self.input_dim,)
-        return best_xopt
-
-    def get_input_with_highest_uncertainty_parrallel(self):
-        best_xopt = np.zeros(self.input_dim)
-        best_fopt = sys.maxsize
-        random_vector = np.random.uniform(
-            size=(self.optimize_restarts, self.input_dim))
-        start_positions = self.lower_bound + \
-            random_vector * (self.b - self.lower_bound)
-
-        def f(x):
-            if x.ndim == 1:
-                X = x[None, :]
-            _, uncertainty = self.predict(X)
-            return - uncertainty
-
-        best_xopt = np.zeros(self.input_dim)
-        best_fopt = sys.maxsize
-        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
-            outputs = executor.map(lambda sp: fmin(
-                f, sp, full_output=True, disp=False), start_positions)
-            for xopt, fopt, _, _, _ in outputs:
-                if fopt < best_fopt and np.all(self.lower_bound < xopt) and np.all(xopt < self.upper_bound):
-                    best_fopt = fopt
-                    best_xopt = xopt
-            return best_xopt
+        # negative uncertainty curve
+        bounds = np.hstack((self.lower_bound[:, None], self.upper_bound[:, None]))
+        # maximizing uncertainty is equal to minimizing negative uncertainty curve
+        x, _, _ = solve(self.__acquisition_curve, self.lower_bound, self.upper_bound, maxT=50, algmethod=1)
+        return x
 
     def __adapt_lf(self):
         X = np.linspace(self.lower_bound, self.upper_bound, 100).reshape(-1, 1)
@@ -288,7 +282,7 @@ class MultifidelityDataFusion(AbstractGP):
         return self.hf_model.predict(X_test)
 
     def plot(self):
-        assert self.input_dim == 1, 'data must be 2 dimensional in order to be plotted'
+        assert self.input_dim <= 2, 'data must be 1 or 2 dimensional'
         self.__plot()
 
     def plot_forecast(self, forecast_range=.5):
@@ -315,7 +309,7 @@ class MultifidelityDataFusion(AbstractGP):
         kern2 = kern_class2(std_input_dim, active_dims=std_indezes)
         kern3 = kern_class3(std_input_dim, active_dims=std_indezes)
         return kern1 * kern2 + kern3
-    
+
     def __plot(self, confidence_inteval_width=2, plot_lf=True, plot_hf=True, plot_pred=True, exceed_range_by=0):
         if (self.input_dim == 1):
             self.__plot1D(confidence_inteval_width, plot_lf, plot_hf, plot_pred, exceed_range_by)
@@ -366,48 +360,45 @@ class MultifidelityDataFusion(AbstractGP):
             plt.title(self.name)
 
     def __plot2D(self, plot_lf=True, plot_hf=True, plot_pred=True):
-        density = 100
-        X = np.linspace(self.lower_bound[0], self.upper_bound[1], density)
-        Y = np.linspace(self.lower_bound[0], self.upper_bound[1], density)
-        X, Y = np.meshgrid(X, Y)
-        
+        density = 35
+        X1 = np.linspace(self.lower_bound[0], self.upper_bound[1], density)
+        X2 = np.linspace(self.lower_bound[0], self.upper_bound[1], density)
+        X1, X2 = np.meshgrid(X1, X2)
+        X = np.array((X1.flatten(), X2.flatten())).T
+        preds, _ = self.predict(X)
+        lf_y = self.f_low(X)
+        hf_y = self.f_exact(X)
+
+        ax = plt.gca(projection='3d')
+        if plot_pred:
+            ax.scatter(X1, X2, preds)
+        if plot_lf:
+            ax.scatter(X1, X2, lf_y)
+        if plot_hf:
+            ax.scatter(X1, X2, hf_y)
+
 
     def __augment_Data(self, X):
+        """augment the hf-inputs with corresponding lf-predictions"""
         assert X.shape == (len(X), self.input_dim)
 
+        # number of new entries for each x in X
         new_entries_count = self.augm_iterator.new_entries_count()
 
+        # compute the neighbour positions of each x in X where f_low will be evaluated
         augm_locations = np.array(list(map(lambda x: [x + i * self.tau for i in self.augm_iterator], X)))
-        # augm_locations = np.vectorize(lambda x: np.asarray([x + i * self.tau for i in self.augm_iterator]), signature="(n,d)->(n,l,d)")(X)
         assert augm_locations.shape == (len(X), new_entries_count, self.input_dim)
 
-        # new_augm_entries = self.__lf_mean_predict(augm_locations)
-        new_augm_entries = np.array(
-            list(map(self.__lf_mean_predict, augm_locations)))
-
+        # compute the lf-prediction on those neighbour positions
+        new_augm_entries = np.array(list(map(self.__lf_mean_predict, augm_locations)))
         assert new_augm_entries.shape == (len(X), new_entries_count, 1)
 
+        # flatten the results of f_low
         new_entries = np.array([entry.flatten() for entry in new_augm_entries])
         assert new_entries.shape == (len(X), new_entries_count)
 
+        # concatenate each x of X with the f_low evaluations at its neighbours
         augmented_X = np.concatenate([X, new_entries], axis=1)
-        assert augmented_X.shape == (
-            len(X), new_entries_count + self.input_dim)
+        assert augmented_X.shape == (len(X), new_entries_count + self.input_dim)
+
         return augmented_X
-
-    # def __update_input_borders(self, X: np.ndarray):
-    #     if self.lower_bound is None and self.b is None:
-    #         self.lower_bound = np.min(X, axis=0)
-    #         self.b = np.max(X, axis=0)
-    #     else:
-    #         self.lower_bound = np.min([self.lower_bound, np.min(X, axis=0)], axis=0)
-    #         self.b = np.max([self.b, np.max(X, axis=0)], axis=0)
-#   GP_augmented_data, select better kernel than RBF
-#   NARGP
-#   MFDGP
-
-# complete adapt (just for high) (look in GPY, bayesian optimization toolbox)
-# complete adapt (for low)
-# combine both
-# check results
-# describe the process
