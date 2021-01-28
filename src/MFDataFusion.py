@@ -117,22 +117,22 @@ class MultifidelityDataFusion(AbstractGP):
         self.hf_model[".*Gaussian_noise"].constrain_positive()
         self.hf_model.optimize_restarts(num_restarts, optimizer = "bfgs",  max_iters = 1000, verbose=False)
 
-    def adapt(self, adapt_steps, plot=None, X_test=None, Y_test=None):
+    def adapt(self, adapt_steps, plot_mode=None, X_test=None, Y_test=None):
         """optimized training of the MFDF model using adapation"""
         self.adapt_steps = adapt_steps
 
-        # different plot modes available
-        adapt_modes = {
-            'u': lambda: self.__adapt_plot_uncertainties(X_test=X_test, Y_test=Y_test),
-            'm': lambda: self.__adapt_plot_means(X_test=X_test, Y_test=Y_test),
-            'e': lambda: self.__adapt_plot_error(X_test=X_test, Y_test=Y_test),
-            'um': lambda: self.__adapt_plot_combined(X_test=X_test, Y_test=Y_test),
-            'mu': lambda: self.__adapt_plot_combined(X_test=X_test, Y_test=Y_test),
-            None: lambda: self.__adapt_no_plot(X_test=X_test, Y_test=Y_test),
+        # there are different plot modes available
+        adapt_mode_dict = {
+            'u':  lambda X, Y: self.__adapt_and_plot(X, Y, plot_uncertainties=True),
+            'm':  lambda X, Y: self.__adapt_and_plot(X, Y, plot_means=True),
+            'e':  lambda X, Y: self.__adapt_and_plot(X, Y, plot_error=True),
+            'um': lambda X, Y: self.__adapt_and_plot(X, Y, plot_means=True, plot_uncertainties=True),
+            'mu': lambda X, Y: self.__adapt_and_plot(X, Y, plot_means=True, plot_uncertainties=True),
+            None: lambda X, Y: self.__adapt_and_plot(X, Y),
         }
 
-        assert plot in adapt_modes.keys(), 'invalid plot mode'
-        adapt_modes.get(plot)()
+        assert plot_mode in adapt_mode_dict.keys(), "invalid plot mode"
+        adapt_mode_dict.get(plot_mode)(X_test, Y_test)
 
     def __adapt_lf(self):
         X = np.linspace(self.lower_bound, self.upper_bound, 100).reshape(-1, 1)
@@ -159,19 +159,18 @@ class MultifidelityDataFusion(AbstractGP):
         X_test = self.__augment_Data(X_test)
         return self.hf_model.predict(X_test)
 
-    def get_mse(self, X_test, y_test):
-        assert len(X_test) == len(
-            y_test), 'number of input values and targets must be equal'
+    def get_mse(self, X_test, Y_test):
+        assert len(X_test) == len(Y_test), 'unequal number of X and y values'
         assert X_test.shape[1] == self.input_dim, 'wrong input value dimension'
-        assert y_test.shape[1] == 1, 'target values must be scalars'
+        assert Y_test.shape[1] == 1, 'target values must be scalars'
 
         preds, _ = self.predict(X_test)
-        mse = mean_squared_error(y_true=y_test, y_pred=preds)
+        mse = mean_squared_error(y_true=Y_test, y_pred=preds)
         return mse
 
     def __get_input_with_highest_uncertainty(self):
         def acquisition_curve(x, dummy):
-            # DIRECT.solve calls this function with x and dummy value
+            # DIRECT.solve() calls this function with x and dummy value
             _, uncertainty = self.predict(x[None])
             return - uncertainty[:, None]
         # maximizing uncertainty is equal to minimizing negative uncertainty
@@ -204,108 +203,93 @@ class MultifidelityDataFusion(AbstractGP):
         return augmented_X
 
     # adaptation
-
-    def __adapt_plot_uncertainties(self, X_test=None, Y_test=None, verbose=False):
-        assert self.input_dim == 1, "only 2d plotting possible"
-        # define input space X
-        X = np.linspace(self.lower_bound, self.upper_bound, 200).reshape(-1, 1)
-        # prepare subplotting
-        subplots_per_row = int(np.ceil(np.sqrt(self.adapt_steps)))
-        subplots_per_column = int(np.ceil(self.adapt_steps / subplots_per_row))
-        fig, axs = plt.subplots(
-            subplots_per_row,
-            subplots_per_column,
-            sharey='row',
-            sharex=True,
-            figsize=(20, 10))
-        fig.suptitle('Uncertainty development during adaptation')
-
-        for i in range(self.adapt_steps):
-            acquired_x = self.__get_input_with_highest_uncertainty()
-            _, uncertainties = self.predict(X)
-            ax = axs.flatten()[i] if self.adapt_steps > 1 else axs
-            ax.axes.xaxis.set_visible(False)
-            mse = np.round(self.get_mse(X_test, Y_test), 4)
-            ax.set_title('mse: {}, hf. points: {}'
-                         .format(mse, len(self.hf_X)))
-            ax.plot(X, uncertainties)
-            ax.plot(acquired_x, 0, 'rx')
-            self.fit(np.vstack((self.hf_X, acquired_x)))
-
-    def __adapt_plot_means(self, X_test=None, Y_test=None, verbose=False):
-        assert self.input_dim == 1, "only 2d plotting possible"
-        X = np.linspace(self.lower_bound, self.upper_bound, 200).reshape(-1, 1)
-        for i in range(self.adapt_steps):
-            acquired_x = self.__get_input_with_highest_uncertainty()
-            means, _ = self.predict(X)
-            plt.plot(X, means, label='step {}'.format(i))
-            self.fit(np.vstack((self.hf_X, acquired_x)))
-        plt.legend()
-
-    def __adapt_plot_combined(self, X_test=None, Y_test=None, verbose=False):
-        assert self.input_dim == 1, "only 2d plotting possible"
-        X = np.linspace(self.lower_bound, self.upper_bound, 200).reshape(-1, 1)
-        fig, axs = plt.subplots(
-            2,
-            self.adapt_steps,
-            sharey='row',
-            sharex=True,
-            figsize=(20, 10))
-
-        axs[0][0].set_ylabel('mean curves', size='large')
-        axs[1][0].set_ylabel('uncertainty curves', size='large')
-
-        for i in range(self.adapt_steps):
-            acquired_x = self.__get_input_with_highest_uncertainty()
-            means, uncertainty = self.predict(X)
-            means = means.flatten()
-            uncertainty = uncertainty.flatten()
-
-            mean_ax = axs[0][i]
-            mean_ax.set_title('{} hf-points'.format(len(self.hf_X)))
-            mean_ax.plot(X, means, 'g')
-            mean_ax.plot(X, self.f_low(X), 'r')
-            mean_ax.plot(X, self.f_exact(X), 'b')
-            mean_ax.plot(self.hf_X, self.hf_Y, 'bx')
-            mean_ax.fill_between(X.flatten(),
-                                 y1=means - 2 * uncertainty,
-                                 y2=means + 2 * uncertainty,
-                                 color=(0, 1, 0, .75)
-                                 )
-
-            uncertainty_ax = axs[1][i]
-            uncertainty_ax.plot(X, uncertainty)
-            uncertainty_ax.plot(acquired_x.reshape(-1, 1), 0, 'rx')
-
-            self.fit(np.vstack((self.hf_X, acquired_x)))
-
-    def __adapt_plot_error(self, X_test=None, Y_test=None, yscale='log'):
-        assert self.input_dim > 0
+    def __adapt_and_plot(self, X_test, Y_test, plot_means: bool=False, plot_uncertainties: bool=False, plot_error: bool=False):
+        X = np.linspace(self.lower_bound, self.upper_bound, 200)
         mses = []
-        for i in range(self.adapt_steps):
-            acquired_x = self.__get_input_with_highest_uncertainty()
-            self.fit(np.vstack((self.hf_X, acquired_x)))
-            mse = self.get_mse(X_test, Y_test)
-            mses.append(mse)
-        hf_X_len_before = len(self.hf_X) - self.adapt_steps
-        hf_X_len_now = len(self.hf_X)
-        plt.title('mean square error')
-        plt.xlabel('hf points')
-        plt.ylabel('mse')
-        plt.yscale(yscale)
-        plt.plot(
-            np.arange(hf_X_len_before, hf_X_len_now),
-            np.array(mses),
-            label=self.name
-        )
-        plt.legend()
 
-    def __adapt_no_plot(self, X_test=None, Y_test=None, verbose=False):
+        plot_combined = plot_means and plot_uncertainties
+        single_plot = plot_means ^ plot_error and not plot_combined
+        # subplot sizes
+        if plot_combined:
+            nrows = 2
+            ncols = self.adapt_steps
+        elif single_plot:
+            nrows = 1 
+            ncols = 1
+        elif plot_uncertainties:
+            nrows = int(np.ceil(np.sqrt(self.adapt_steps)))
+            ncols = int(np.ceil(self.adapt_steps / nrows))
+
+        if plot_means or plot_error or plot_uncertainties:
+            fig, axs = plt.subplots(
+                nrows,
+                ncols,
+                sharey='row',
+                sharex=True,
+                figsize=(20, 10))
+        
+        if plot_combined:
+            axs[0][0].set_ylabel('mean curves', size='large')
+            axs[1][0].set_ylabel('uncertainty curves', size='large')
+
+        # adaptation loop
         for i in range(self.adapt_steps):
             acquired_x = self.__get_input_with_highest_uncertainty()
+            means, uncertainties = self.predict(X)
             new_hf_X = np.vstack((self.hf_X, acquired_x))
-            assert new_hf_X.shape == (len(self.hf_X) + 1, self.input_dim)
+            
+            if plot_combined:
+                means, uncertainties = means.flatten(), uncertainties.flatten()
+                # means row
+                mean_ax = axs[0][i]
+                mean_ax.set_title('{} hf-points'.format(len(self.hf_X)))
+                mean_ax.plot(X, means, 'g')
+                mean_ax.plot(X, self.f_low(X), 'r')
+                mean_ax.plot(X, self.f_exact(X), 'b')
+                mean_ax.plot(self.hf_X, self.hf_Y, 'bx')
+                mean_ax.fill_between(X.flatten(),
+                                    y1=means - 2 * uncertainties,
+                                    y2=means + 2 * uncertainties,
+                                    color=(0, 1, 0, .75)
+                                    )
+                # uncertainty row
+                uncertainty_ax = axs[1][i]
+                uncertainty_ax.plot(X, uncertainties)
+                uncertainty_ax.plot(acquired_x.reshape(-1, 1), 0, 'rx')
+            elif plot_uncertainties:
+                ax = axs.flatten()[i] if self.adapt_steps > 1 else axs
+                ax.axes.xaxis.set_visible(False)
+                mse = np.round(self.get_mse(X_test, Y_test), 4)
+                ax.set_title('mse: {}, hf. points: {}'.format(mse, len(self.hf_X)))
+                ax.plot(X, uncertainties)
+                ax.plot(acquired_x, 0, 'rx')
+            elif plot_means:
+                axs.plot(X, means, label='step {}'.format(i))
+                plt.legend()
+            elif plot_error:
+                mse = self.get_mse(X_test, Y_test)
+                mses.append(mse)
+
             self.fit(new_hf_X)
+
+        if plot_error:
+            hf_X_len_before = len(self.hf_X) - self.adapt_steps
+            hf_X_len_now = len(self.hf_X)
+            plt.title('mean square error')
+            plt.xlabel('hf points')
+            plt.ylabel('mse')
+            plt.yscale('log')
+            plt.plot(
+                np.arange(hf_X_len_before, hf_X_len_now),
+                np.array(mses),
+                label=self.name
+            )
+            plt.legend()
+        elif single_plot:
+            Y = means if plot_means else uncertainties
+            plt.plot(X, Y, label='step {}'.format(i))
+            plt.legend()
+
 
     # plotting
 
