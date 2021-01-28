@@ -48,7 +48,7 @@ class MultifidelityDataFusion(AbstractGP):
     :param lf_hf_adapt_ratio: number of lf-adapt-steps = #hf-adapt-steps * lf_hf_adapt_ratio, defaults to 1
     :type lf_hf_adapt_ratio: int, optional
 
-    :param use_composite_kernel: if True NARGP composite kernel used, otherwise RBF kernel, defaults to True
+    :param use_composite_kernel: if True use composite NARGP kernel, otherwise RBF kernel, defaults to True
     :type use_composite_kernel: bool, optional
     """
 
@@ -77,10 +77,10 @@ class MultifidelityDataFusion(AbstractGP):
 
         self.__initialize_kernel(use_composite_kernel)
 
-        self.__initialize_lf_model(f_low, lf_X, lf_Y)
+        self.__initialize_lf_level(f_low, lf_X, lf_Y)
 
     def __initialize_kernel(self, use_composite_kernel: bool):
-        """initializes kernel of hf-model, either use the composite NARGP-kernel or standard RBF
+        """initializes kernel of hf-model, either use composite NARGP kernel or standard RBF
 
         :param use_composite_kernel: use composite NARGP kernel
         :type use_composite_kernel: bool
@@ -93,7 +93,7 @@ class MultifidelityDataFusion(AbstractGP):
             self.kernel = GPy.kern.RBF(new_input_dims)
 
     def get_NARGP_kernel(self, kern_class1=GPy.kern.RBF, kern_class2=GPy.kern.RBF, kern_class3=GPy.kern.RBF):
-        """build composite NARGP kernel
+        """build composite NARGP kernel with proper dimension and kernel classes
 
         :param kern_class1: first kernel class, defaults to GPy.kern.RBF
         :type kern_class1: GPy.kern.src.kernel_slice_operations.KernCallsViaSlicerMeta, optional
@@ -116,8 +116,9 @@ class MultifidelityDataFusion(AbstractGP):
         kern3 = kern_class3(std_input_dim, active_dims=std_indezes)
         return kern1 * kern2 + kern3
 
-    def __initialize_lf_model(self, f_low: callable, lf_X: np.ndarray, lf_Y: np.ndarray):
-        """initialize low-fidelity model by python function or by training data
+    def __initialize_lf_level(self, f_low: callable=None, lf_X: np.ndarray=None, lf_Y: np.ndarray=None):
+        """initialize low-fidelity level by python function or by trained GP model,
+        pass either a lf prediction function or lf training data
 
         :param f_low: low fidelity prediction function
         :type f_low: callable
@@ -145,10 +146,9 @@ class MultifidelityDataFusion(AbstractGP):
         else:
             self.__lf_mean_predict = f_low
 
-    # workflow
-
     def fit(self, hf_X):
-        """fits the high fidelity model
+        """fits the model by fitting its high-fidelity model with a augmented
+        version of the input high-fidelity training data 
 
         :param hf_X: training input vectors
         :type hf_X: np.ndarray
@@ -180,8 +180,10 @@ class MultifidelityDataFusion(AbstractGP):
         self.hf_model.optimize_restarts(num_restarts, optimizer = "bfgs",  max_iters = 1000, verbose=False)
 
     def adapt(self, adapt_steps:int, plot_mode:str=None, X_test:np.ndarray=None, Y_test:np.ndarray=None):
-        """optimize the hf-model by acquiring additional hf-training points for training
-
+        """optimizes the hf-model by acquiring new hf-training data points, which at each step,
+        reduce the uncertainty of the model the most. The new point it the one, whose corresponding 
+        prediction whould come with the highest uncertainty.
+        
         :param adapt_steps: number of new high-fidelity data points
         :type adapt_steps: int
         :param plot_mode: possible modes are 'm', 'u', 'e', and 'mu', defaults to None
@@ -210,11 +212,11 @@ class MultifidelityDataFusion(AbstractGP):
         adapt_mode_dict.get(plot_mode)()
 
     def __adapt_lf(self):
-        """optimize the hf-model by acquiring additional hf-training points for training"""
+        """optimizes the hf-model by acquiring additional hf-training points for training"""
         
         # TODO: update
         for i in range(self.adapt_steps * self.lf_hf_adapt_ratio):
-
+            
 
             self.lf_X = np.vstack((self.lf_X, None))
             self.lf_Y = np.vstack((self.lf_Y, None))
@@ -228,7 +230,8 @@ class MultifidelityDataFusion(AbstractGP):
             )
 
     def predict(self, X_test):
-        """predict function
+        """for an array of input vectors computes the corresponding 
+        target values
 
         :param X_test: input vectors
         :type X_test: np.ndarray
@@ -242,7 +245,7 @@ class MultifidelityDataFusion(AbstractGP):
         return self.hf_model.predict(X_test)
 
     def get_mse(self, X_test, Y_test):
-        """compute mean square error
+        """compute the mean square error the given test data
 
         :param X_test: test input vectors
         :type X_test: np.ndarray
@@ -272,7 +275,8 @@ class MultifidelityDataFusion(AbstractGP):
         return x
 
     def __augment_Data(self, X):
-        """augment high-fidelity inputs with corresponding low-fidelity predictions
+        """augments high-fidelity inputs with corresponding low-fidelity predictions.
+        The augmentation pattern is determined by self.augm_iterator
 
         :param X: high-fidelity input vectors
         :type X: np.ndarray
@@ -305,7 +309,7 @@ class MultifidelityDataFusion(AbstractGP):
 
     # adaptation
     def __adapt_and_plot(self, plot_means: bool=False, plot_uncertainties: bool=False, plot_error: bool=False):
-        """optimize the model by adaptation of new high-fidelity points, plot the process
+        """model adaptation and plotting to illustrate the process of optimization
 
         :param plot_means: plot mean curves, defaults to False
         :type plot_means: bool, optional
@@ -416,7 +420,7 @@ class MultifidelityDataFusion(AbstractGP):
         self.__plot(exceed_range_by=forecast_range)
 
     def plot_uncertainties_2D(self):
-        """3d plot of the uncertainty for 2D input"""
+        """3D plot the of the uncertainty plane"""
 
         assert self.input_dim == 2, 'method only callable for 2 dim'
         density = 60
