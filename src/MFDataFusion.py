@@ -10,7 +10,6 @@ import time
 import sys
 import multiprocessing
 import concurrent.futures
-from scipydirect import minimize
 from DIRECT import solve
 
 def timer(func):
@@ -102,7 +101,15 @@ class MultifidelityDataFusion(AbstractGP):
             kernel=self.kernel,
             initialize=True
         )
-        self.hf_model.optimize_restarts(num_restarts=6, verbose=False)  # ARD
+        # self.hf_model.optimize_restarts(num_restarts=6, verbose=False)  # ARD
+        # Following are the ARD steps
+        num_restarts = 6
+        self.hf_model[".*Gaussian_noise"] = self.hf_model.Y.var()*0.01
+        self.hf_model[".*Gaussian_noise"].fix()
+        self.hf_model.optimize(max_iters = 500)
+        self.hf_model[".*Gaussian_noise"].unfix()
+        self.hf_model[".*Gaussian_noise"].constrain_positive()
+        self.hf_model.optimize_restarts(num_restarts, optimizer = "bfgs",  max_iters = 1000, verbose=False)
 
     def adapt(self, adapt_steps, plot=None, X_test=None, Y_test=None):
         """optimized training of the MFDF model using adapation"""
@@ -234,6 +241,8 @@ class MultifidelityDataFusion(AbstractGP):
             acquired_x = self.get_input_with_highest_uncertainty()
             new_hf_X = np.vstack((self.hf_X, acquired_x))
             assert new_hf_X.shape == (len(self.hf_X) + 1, self.input_dim)
+            # self.plot_uncertainties_2D()
+            # plt.show()
             self.fit(new_hf_X)
 
     def __acquisition_curve(self, x1, foo):
