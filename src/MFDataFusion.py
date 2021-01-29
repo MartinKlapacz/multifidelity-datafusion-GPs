@@ -2,7 +2,7 @@ import GPy
 import numpy as np
 import matplotlib.pyplot as plt
 
-from src.abstractGP import AbstractGP
+from src.abstractMFGP import AbstractMFGP
 from src.augmentationIterators import EvenAugmentation, BackwardAugmentation
 from sklearn.metrics import mean_squared_error
 from scipy.optimize import fmin
@@ -12,16 +12,19 @@ import multiprocessing
 import concurrent.futures
 from DIRECT import solve
 
-class MultifidelityDataFusion(AbstractGP):
-    """multifidelity Data fusion model 
+class MultifidelityDataFusion(AbstractMFGP):
+    """This is a machine learning model meant for regression tasks in a multifielity setting, 
+    where a scarce/precise (high-fidelity) and an abundant/imprecise (low-fidelity) data set
+    are available.
 
-    :param name: name which will be used in plots
+    :param name: name of the model which will be used in plots
     :type name: str
 
-    :param input_dim: input vector dimension
+    :param input_dim: dimension of the input vectors in the data sets
     :type input_dim: int
 
-    :param num_derivatives: number of implicitly included derivatives
+    :param num_derivatives: number of implicitly included derivatives, 
+    for given n: derivatives 0, ..., n are computed
     :type num_derivatives: int
 
     :param tau: distance to the augmentation neighbors, used for data augmentation
@@ -130,7 +133,7 @@ class MultifidelityDataFusion(AbstractGP):
 
         # check if the parameters are correctly given
         lf_model_params_are_valid = (f_low is not None) ^ (
-            (lf_X is not None) and (lf_Y is not None) and (lf_hf_adapt_ratio is not None))
+            (lf_X is not None) and (lf_Y is not None) and (self.lf_hf_adapt_ratio is not None))
         assert lf_model_params_are_valid, 'define low-fidelity model either by predicition function or by data'
 
         self.data_driven_lf_approach = f_low is None
@@ -141,10 +144,9 @@ class MultifidelityDataFusion(AbstractGP):
                 X=lf_X, Y=lf_Y, initialize=True
             )
             self.lf_model.optimize()
-            self.__adapt_lf()
-            self.__lf_mean_predict = lambda t: self.lf_model.predict(t)[0]
+            self.f_low = lambda t: self.lf_model.predict(t)[0]
         else:
-            self.__lf_mean_predict = f_low
+            self.f_low = f_low
 
     def fit(self, hf_X):
         """fits the model by fitting its high-fidelity model with a augmented
@@ -171,13 +173,7 @@ class MultifidelityDataFusion(AbstractGP):
             initialize=True
         )
         # ARD steps
-        num_restarts = 6
-        self.hf_model[".*Gaussian_noise"] = self.hf_model.Y.var()*0.01
-        self.hf_model[".*Gaussian_noise"].fix()
-        self.hf_model.optimize(max_iters = 500)
-        self.hf_model[".*Gaussian_noise"].unfix()
-        self.hf_model[".*Gaussian_noise"].constrain_positive()
-        self.hf_model.optimize_restarts(num_restarts, optimizer = "bfgs",  max_iters = 1000, verbose=False)
+        self.__ARD(self.hf_model, 6)
 
     def adapt(self, adapt_steps:int, plot_mode:str=None, X_test:np.ndarray=None, Y_test:np.ndarray=None):
         """optimizes the hf-model by acquiring new hf-training data points, which at each step,
@@ -198,6 +194,9 @@ class MultifidelityDataFusion(AbstractGP):
         self.X_test = X_test
         self.Y_test = Y_test
 
+        if self.data_driven_lf_approach:
+            self.__adapt_lf()
+
         # there are different plot modes available
         adapt_mode_dict = {
             'u':  lambda: self.__adapt_and_plot(plot_uncertainties=True),
@@ -214,20 +213,26 @@ class MultifidelityDataFusion(AbstractGP):
     def __adapt_lf(self):
         """optimizes the hf-model by acquiring additional hf-training points for training"""
         
-        # TODO: update
+        assert hasattr(self, 'lf_model'), "lf-model not initialized"
         for i in range(self.adapt_steps * self.lf_hf_adapt_ratio):
-            
+            acquired_x = self.__get_input_with_highest_uncertainty(self.lf_model)
+            acquired_y = self.lf_model.predict(acquired_x[None])[0][0]
 
-            self.lf_X = np.vstack((self.lf_X, None))
-            self.lf_Y = np.vstack((self.lf_Y, None))
+            self.lf_X = np.vstack((self.lf_X, acquired_x))
+            self.lf_Y = np.vstack((self.lf_Y, acquired_y))
 
             self.lf_model = GPy.models.GPRegression(
                 self.lf_X, self.lf_Y, initialize=True
             )
-            self.lf_model.optimize_restarts(
-                num_restarts=5,
-                optimizer='tnc'
-            )
+            self.__ARD(self.lf_model, 6)
+
+    def __ARD(self, model, num_restarts):
+            model[".*Gaussian_noise"] = model.Y.var()*0.01
+            model[".*Gaussian_noise"].fix()
+            model.optimize(max_iters = 500)
+            model[".*Gaussian_noise"].unfix()
+            model[".*Gaussian_noise"].constrain_positive()
+            model.optimize_restarts(num_restarts, optimizer = "bfgs",  max_iters = 1000, verbose=False)
 
     def predict(self, X_test):
         """for an array of input vectors computes the corresponding 
@@ -263,12 +268,13 @@ class MultifidelityDataFusion(AbstractGP):
         mse = mean_squared_error(y_true=Y_test, y_pred=preds)
         return mse
 
-    def __get_input_with_highest_uncertainty(self):
+    def __get_input_with_highest_uncertainty(self, model):
         """get input from input domain whose prediction comes with the highest uncertainty"""
+        assert hasattr(model, 'predict')
 
         def acquisition_curve(x, dummy):
             # DIRECT.solve() calls this function with x and dummy value
-            _, uncertainty = self.predict(x[None])
+            _, uncertainty = model.predict(x[None])
             return - uncertainty[:, None]
         # DIRECT minimisation optimizer
         x, _, _ = solve(acquisition_curve, self.lower_bound, self.upper_bound, maxT=50, algmethod=1)
@@ -294,7 +300,7 @@ class MultifidelityDataFusion(AbstractGP):
         assert augm_locations.shape == (len(X), new_entries_count, self.input_dim)
 
         # compute the lf-prediction on those neighbour positions
-        new_augm_entries = np.array(list(map(self.__lf_mean_predict, augm_locations)))
+        new_augm_entries = np.array(list(map(self.f_low, augm_locations)))
         assert new_augm_entries.shape == (len(X), new_entries_count, 1)
 
         # flatten the results of f_low
@@ -349,7 +355,7 @@ class MultifidelityDataFusion(AbstractGP):
 
         # adaptation loop
         for i in range(self.adapt_steps):
-            acquired_x = self.__get_input_with_highest_uncertainty()
+            acquired_x = self.__get_input_with_highest_uncertainty(self)
             means, uncertainties = self.predict(X)
             new_hf_X = np.vstack((self.hf_X, acquired_x))
             
@@ -412,9 +418,11 @@ class MultifidelityDataFusion(AbstractGP):
         self.__plot()
 
     def plot_forecast(self, forecast_range=.5):
-        """plot low-fidelity mean, high-fidelity mean and exact mean curve with 
+        """plot low-fidelity mean, high-fidelity mean and exact mean curve with
+        extended x-axis
 
-        :param forecast_range: (1 + forecast_range) * (upper_bound - lower_bound) x-axis length, defaults to .5
+        :param forecast_range: x-axis range in the figure is given by 
+        (1 + forecast_range) * (upper_bound - lower_bound), defaults to .5
         :type forecast_range: float, optional
         """
         self.__plot(exceed_range_by=forecast_range)
@@ -432,6 +440,7 @@ class MultifidelityDataFusion(AbstractGP):
         ax = plt.gca(projection='3d')
         ax.scatter(X1, X2, uncertainties)
         ax.scatter(self.hf_X[:, 0], self.hf_X[:, 1], 0)
+        ax.plt_surface(X1, X2, )
         plt.show()
 
     def __plot(self, plot_lf=True, plot_hf=True, plot_pred=True, exceed_range_by=0):
@@ -476,7 +485,7 @@ class MultifidelityDataFusion(AbstractGP):
         if (not self.data_driven_lf_approach):
             self.lf_X = np.linspace(
                 self.lower_bound, self.upper_bound, 50).reshape(-1, 1)
-            self.lf_Y = self.__lf_mean_predict(self.lf_X)
+            self.lf_Y = self.f_low(self.lf_X)
 
         lf_color, hf_color, pred_color = 'r', 'b', 'g'
 
@@ -485,7 +494,7 @@ class MultifidelityDataFusion(AbstractGP):
             # plot low fidelity
             plt.plot(self.lf_X, self.lf_Y, lf_color +
                      'x', label='low-fidelity')
-            plt.plot(X, self.__lf_mean_predict(X), lf_color,
+            plt.plot(X, self.f_low(X), lf_color,
                      label='f_low', linestyle='dashed')
 
         if plot_hf:
