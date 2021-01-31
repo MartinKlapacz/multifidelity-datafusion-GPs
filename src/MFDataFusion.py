@@ -177,8 +177,8 @@ class MultifidelityDataFusion(AbstractMFGP):
 
     def adapt(self, adapt_steps:int, plot_mode:str=None, X_test:np.ndarray=None, Y_test:np.ndarray=None):
         """optimizes the hf-model by acquiring new hf-training data points, which at each step,
-        reduce the uncertainty of the model the most. The new point it the one, whose corresponding 
-        prediction whould come with the highest uncertainty.
+        reduce the uncertainty of the model the most. The new point will be the one, whose corresponding 
+        prediction value whould come with the highest uncertainty.
         
         :param adapt_steps: number of new high-fidelity data points
         :type adapt_steps: int
