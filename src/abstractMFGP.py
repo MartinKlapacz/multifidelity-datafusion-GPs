@@ -3,14 +3,15 @@ import abc
 import GPy
 import matplotlib.pyplot as plt
 from DIRECT import solve
+from .adaptation_maximizers import DIRECT1_maximizer, AbstractMaximizer
 
 
 class AbstractMFGP(metaclass=abc.ABCMeta):
 
     @abc.abstractmethod
     def __init__(self, name: str, input_dim: int, num_derivatives: int, tau: float, f_exact: callable,
-                 lower_bound: np.ndarray = None, upper_bound: float = None, f_low: callable = None, lf_X: np.ndarray = None,
-                 lf_Y: np.ndarray = None, lf_hf_adapt_ratio: int = 1, use_composite_kernel: bool = True,):
+                 lower_bound: np.ndarray, upper_bound: float, f_low: callable, lf_X: np.ndarray, lf_Y: np.ndarray,
+                 lf_hf_adapt_ratio: int, use_composite_kernel: bool, adapt_maximizer: AbstractMaximizer):
 
         super().__init__()
         self.name = name
@@ -20,6 +21,7 @@ class AbstractMFGP(metaclass=abc.ABCMeta):
         self.f_exact = f_exact
         self.f_low = f_low
         self.lf_hf_adapt_ratio = lf_hf_adapt_ratio
+        self.adapt_maximizer = adapt_maximizer
 
         # data bounds
         if lower_bound is None and upper_bound is None:
@@ -122,12 +124,7 @@ class AbstractMFGP(metaclass=abc.ABCMeta):
         """get input from input domain whose prediction comes with the highest uncertainty"""
         assert hasattr(model, 'predict')
 
-        def acquisition_curve(x, dummy):
-            # DIRECT.solve() calls this function with x and dummy value
-            _, uncertainty = model.predict(x[None])
-            return - uncertainty[:, None]
-        # DIRECT minimisation optimizer
-        x, fopt, _ = solve(acquisition_curve, self.lower_bound, self.upper_bound, maxT=50, algmethod=1)
+        x, fopt = self.adapt_maximizer.maximize(self.predict, self.lower_bound, self.upper_bound)
         return x, fopt
 
     def ARD(self, model, num_restarts):
@@ -357,7 +354,7 @@ class AbstractMFGP(metaclass=abc.ABCMeta):
                 # stop after condition
                 # print massage
                 # self.adapt_steps = i
-                
+
                 # print("Iteration stopped after {} iterations!" % i
                 #      + " minimum uncertainty reached: {}" % fopt)
                 break
