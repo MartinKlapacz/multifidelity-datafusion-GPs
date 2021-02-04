@@ -1,5 +1,5 @@
-from .MethodAssessment import MethodAssessment
-from .MFDataFusion import MultifidelityDataFusion
+from src.MFDataFusion import MultifidelityDataFusion
+from src.MethodAssessment import MethodAssessment
 
-from .data.exampleCurves1D import *
-from .data.exampleCurves2D import *
+import src.data.exampleCurves1D as example1D
+import src.data.exampleCurves2D as example2D

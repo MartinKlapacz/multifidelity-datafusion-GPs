@@ -1,12 +1,10 @@
 import GPy
 import numpy as np
 import matplotlib.pyplot as plt
-import multiprocessing
-import concurrent.futures
 from DIRECT import solve
 
-from src.abstractMFGP import AbstractMFGP
-from src.augm_iterators import EvenAugmentation, BackwardAugmentation
+from .abstractMFGP import AbstractMFGP
+from .augm_iterators import EvenAugmentation, BackwardAugmentation
 from sklearn.metrics import mean_squared_error
 from scipy.optimize import fmin
 
@@ -63,7 +61,7 @@ class MultifidelityDataFusion(AbstractMFGP):
                          use_composite_kernel=use_composite_kernel)
 
         # augmentation pattern defined by iterator from augmentationIterators.py
-        self.augm_iterator = EvenAugmentation(self.num_derivatives, dim=input_dim)
+        self.augm_iterator = BackwardAugmentation(self.num_derivatives, dim=input_dim)
 
         self.initialize_kernel(use_composite_kernel)
 
