@@ -11,7 +11,7 @@ class AbstractMFGP(metaclass=abc.ABCMeta):
     def __init__(self, name: str, input_dim: int, num_derivatives: int, tau: float, f_exact: callable,
                  lower_bound: np.ndarray = None, upper_bound: float = None, f_low: callable = None, lf_X: np.ndarray = None,
                  lf_Y: np.ndarray = None, lf_hf_adapt_ratio: int = 1, use_composite_kernel: bool = True,):
-                 
+
         super().__init__()
         self.name = name
         self.input_dim = input_dim
@@ -274,7 +274,6 @@ class AbstractMFGP(metaclass=abc.ABCMeta):
         if plot_hf:
             ax.scatter(X1, X2, hf_y)
 
-
     def adapt_and_plot(
             self, plot_means: bool = False, plot_uncertainties: bool = False, plot_error: bool = False, eps: float = 1e-8):
         """model adaptation and plotting to illustrate the process of optimization
@@ -357,6 +356,10 @@ class AbstractMFGP(metaclass=abc.ABCMeta):
             if np.abs(fopt) < eps:
                 # stop after condition
                 # print massage
+                # self.adapt_steps = i
+                
+                # print("Iteration stopped after {} iterations!" % i
+                #      + " minimum uncertainty reached: {}" % fopt)
                 break
 
         if plot_error:

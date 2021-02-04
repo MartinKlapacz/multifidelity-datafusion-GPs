@@ -6,7 +6,7 @@ import concurrent.futures
 from DIRECT import solve
 
 from src.abstractMFGP import AbstractMFGP
-from src.augmentationIterators import EvenAugmentation, BackwardAugmentation
+from src.augm_iterators import EvenAugmentation, BackwardAugmentation
 from sklearn.metrics import mean_squared_error
 from scipy.optimize import fmin
 
