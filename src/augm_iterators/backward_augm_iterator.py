@@ -1,6 +1,7 @@
 import numpy as np
 from .abstract_augm_iterator import AbstractAugmIterator
 
+
 class BackwardAugmentation(AbstractAugmIterator):
     """ generates a number sequence 0, -1, -2, ..., -n.
     Can be used to build a manifold function g with input pattern 
@@ -8,13 +9,13 @@ class BackwardAugmentation(AbstractAugmIterator):
 
     :param n: number of derivatives to include
     :type n: integer
-    :param dim: input dimension of the model used to (dim of first param in g), 
-    defaults to 1
+    :param dim: input dimension of the model used using this iterator
+    for augmentation (dim of first param in g), defaults to 1
     :type dim: int, optional
     """
 
     def __init__(self, n, dim=1):
-        super().__init__(n, dim=dim)        
+        super().__init__(n, dim=dim)
 
     def __next__(self):
         vector = np.zeros(self.dim)

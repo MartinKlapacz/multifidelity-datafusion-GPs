@@ -1,15 +1,21 @@
 import numpy as np
 from .abstract_augm_iterator import AbstractAugmIterator
 
+
 class EvenAugmentation(AbstractAugmIterator):
-    """generates a number sequence 0, 1, -1, 2, -2, ..., n, -n.
-    Can be used to build a manifold function with input pattern 
+    """ generates a number sequence 0, 1, -1, 2, -2, ..., n, -n.
+    Can be used to build a manifold function g with input pattern 
     g(t, f_l(t - n*tau), ..., f_l(t), ..., f_l(t + n*tau)) if dim = 1.
+
+    :param n: number of derivatives to include
+    :type n: integer
+    :param dim: input dimension of the model used using this iterator
+    for augmentation (dim of first param in g), defaults to 1
+    :type dim: int, optional
     """
 
     def __init__(self, n, dim=1):
         super().__init__(n, dim=dim)
-
 
     def __next__(self):
         vector = np.zeros(self.dim)
@@ -24,7 +30,7 @@ class EvenAugmentation(AbstractAugmIterator):
                     self.sign = 1
                 else:
                     self.dim_i += 1
-                return vector 
+                return vector
             if self.sign == 1:
                 vector[self.dim_i] = self.i
                 if self.dim_i == self.dim - 1:
@@ -33,7 +39,7 @@ class EvenAugmentation(AbstractAugmIterator):
                     self.i += 1
                 else:
                     self.dim_i += 1
-                return vector 
+                return vector
 
         self.reset()
         raise StopIteration
