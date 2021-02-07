@@ -57,3 +57,8 @@ class MethodAssessment:
         for model in self.models:
             mses[model.name] = model.get_mse(self.X_test, self.Y_test)
         return mses
+
+    def plot_compare_with_exact(self):
+        plt.figure()
+        for model in self.models:
+            model.plot_compare_with_exact()

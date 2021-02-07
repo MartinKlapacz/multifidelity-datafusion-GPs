@@ -351,6 +351,7 @@ class AbstractMFGP(metaclass=abc.ABCMeta):
 
             self.fit(new_hf_X)
             if np.abs(fopt) < eps:
+                self.adapt_steps = i + 1
                 print("Iteration stopped after {} iterations!".format(i + 1)
                       + " minimum uncertainty reached: {:e}".format(fopt))
                 break
@@ -372,3 +373,15 @@ class AbstractMFGP(metaclass=abc.ABCMeta):
             Y = means if plot_means else uncertainties
             plt.plot(X, Y, label='step {}'.format(i))
             plt.legend()
+
+    def plot_compare_with_exact(self):
+        X = np.linspace(self.lower_bound, self.upper_bound, 100)
+        Y, _ = self.predict(X)
+        Y_exact = self.f_exact(X)
+        diag = [Y_exact[0], Y_exact[-1]]
+
+        plt.plot(Y, Y_exact, 'o', label=self.name)
+        plt.plot(Y_exact, Y_exact, 'r')
+        plt.ylabel('exact f')
+        plt.xlabel('predictions')
+        plt.legend()
