@@ -109,7 +109,7 @@ class AbstractMFGP(metaclass=abc.ABCMeta):
 
         assert hasattr(self, 'lf_model'), "lf-model not initialized"
         for i in range(self.adapt_steps * self.lf_hf_adapt_ratio):
-            acquired_x = self.get_input_with_highest_uncertainty(self.lf_model)
+            acquired_x, _ = self.get_input_with_highest_uncertainty(self.lf_model)
             acquired_y = self.lf_model.predict(acquired_x[None])[0][0]
 
             self.lf_X = np.vstack((self.lf_X, acquired_x))
@@ -272,7 +272,7 @@ class AbstractMFGP(metaclass=abc.ABCMeta):
             ax.scatter(X1, X2, hf_y)
 
     def adapt_and_plot(
-            self, plot_means: bool = False, plot_uncertainties: bool = False, plot_error: bool = False, eps: float = 1e-8):
+            self, plot_means: bool = False, plot_uncertainties: bool = False, plot_error: bool = False, eps: float = 1e-4):
         """model adaptation and plotting to illustrate the process of optimization
 
         :param plot_means: plot mean curves, defaults to False
@@ -351,12 +351,8 @@ class AbstractMFGP(metaclass=abc.ABCMeta):
 
             self.fit(new_hf_X)
             if np.abs(fopt) < eps:
-                # stop after condition
-                # print massage
-                # self.adapt_steps = i
-
-                # print("Iteration stopped after {} iterations!" % i
-                #      + " minimum uncertainty reached: {}" % fopt)
+                print("Iteration stopped after {} iterations!".format(i + 1)
+                      + " minimum uncertainty reached: {:e}".format(fopt))
                 break
 
         if plot_error:

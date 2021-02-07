@@ -1,3 +1,3 @@
-from .GP_data_fusion import *
-from .GP_data_fusion_with_augmentation import *
+from .GPDF import GPDF
+from .GPDFC import GPDFC
 from .NARGP import NARGP

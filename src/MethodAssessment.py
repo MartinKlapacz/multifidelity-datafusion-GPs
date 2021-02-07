@@ -10,8 +10,8 @@ class MethodAssessment:
         assert len(models) > 0
         assert np.all([models[0].input_dim == m.input_dim for m in models]), \
             "all models must have same input dim"
-        for model in models:
-            assert isinstance(model, MultifidelityDataFusion)
+        assert len(set(map(lambda m: m.name, models))) == len(models), \
+            "models must have different names"
         self.models = models
         self.X_test = X_test
         self.Y_test = Y_test
@@ -25,7 +25,7 @@ class MethodAssessment:
         for model in self.models:
             model.fit(hf_X=X_train)
 
-    def adapt_models(self, adapt_steps:int, plot_mode:str=None):
+    def adapt_models(self, adapt_steps: int, plot_mode: str = None):
         """adapt all models in self.models
 
         :param adapt_steps: number of new hf-points per model
@@ -36,8 +36,8 @@ class MethodAssessment:
         assert plot_mode in [None, 'e']
         for model in self.models:
             model.adapt(adapt_steps, plot_mode=plot_mode,
-                              X_test=self.X_test, 
-                              Y_test=self.Y_test)
+                        X_test=self.X_test,
+                        Y_test=self.Y_test)
 
     def plot(self):
         for model in self.models:
