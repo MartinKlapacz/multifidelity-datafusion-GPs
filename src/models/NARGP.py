@@ -5,6 +5,11 @@ import numpy as np
 
 
 class NARGP:
+    """Nonlinear autoregressive multi-fidelity GP model,
+    expects high-fidelity data to train the high-fidelity its model and low-fidelity data to train its
+    low-fidelity model. Augments its high-fidelity data only with low-fidelity predictions.
+    Uses composite NARGP kernel with ARD weights.
+    """
 
     def __init__(self, input_dim: int, tau: float, f_exact: callable, f_low: callable, name: str = 'NARGP',
                  lower_bound: np.ndarray = None, upper_bound: np.ndarray = None, lf_X: np.ndarray = None, lf_Y: np.

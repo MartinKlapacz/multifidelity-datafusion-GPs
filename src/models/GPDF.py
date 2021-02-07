@@ -5,6 +5,11 @@ import numpy as np
 
 
 class GPDF:
+    """Gaussian Process with Data Fusion, 
+    expects high-fidelity data to train its high-fidelity model and low-fidelity data to train its
+    low-fidelity model. Augments high-fidelity data with low-fidelity predictions and implicit derivatives.
+    Uses standard RBF kernel with ARD weigts.
+    """
 
     def __init__(self, input_dim: int, tau: float, num_derivatives: int, f_exact: callable, f_low: callable, 
                  name: str='GPDF', lower_bound: np.ndarray = None, upper_bound: np.ndarray = None, lf_X: np.ndarray = None, 
