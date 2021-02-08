@@ -272,7 +272,7 @@ class AbstractMFGP(metaclass=abc.ABCMeta):
             ax.scatter(X1, X2, hf_y)
 
     def adapt_and_plot(
-            self, plot_means: bool = False, plot_uncertainties: bool = False, plot_error: bool = False, eps: float = 1e-4):
+            self, plot_means: bool = False, plot_uncertainties: bool = False, plot_error: bool = False, eps: float = 1e-8):
         """model adaptation and plotting to illustrate the process of optimization
 
         :param plot_means: plot mean curves, defaults to False
@@ -375,7 +375,7 @@ class AbstractMFGP(metaclass=abc.ABCMeta):
             plt.legend()
 
     def plot_compare_with_exact(self):
-        X = np.linspace(self.lower_bound, self.upper_bound, 100)
+        X = np.linspace(self.lower_bound, self.upper_bound * 3, 100)
         Y, _ = self.predict(X)
         Y_exact = self.f_exact(X)
         diag = [Y_exact[0], Y_exact[-1]]

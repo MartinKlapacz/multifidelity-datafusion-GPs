@@ -128,3 +128,13 @@ def get_curve(f_low, f_high, num_hf, num_lf):
     y_test = f_high(X_test)
     assert len(X_train_hf) < len(X_train_lf)
     return X_train_hf, X_train_lf, y_train_lf, f_high, f_low, X_test, y_test
+
+import matplotlib.pyplot as plt
+import numpy as np
+
+def f_low(t): return np.sin(8 * pi * t)
+def f_high(t): return (t - 1.41) * f_low(t)**2
+
+X = np.linspace(0, 5, 1000)
+plt.plot(f_low(X), f_high(X), 'bo')
+plt.show()
