@@ -56,12 +56,12 @@ class MultifidelityDataFusion(AbstractMFGP):
     def __init__(self, name: str, input_dim: int, num_derivatives: int, tau: float, f_exact: callable,
                  lower_bound: np.ndarray = None, upper_bound: float = None, f_low: callable = None, lf_X: np.ndarray = None,
                  lf_Y: np.ndarray = None, lf_hf_adapt_ratio: int = 1, use_composite_kernel: bool = True,
-                 adapt_maximizer: AbstractMaximizer = DIRECT1Maximizer()):
+                 adapt_maximizer: AbstractMaximizer = DIRECT1Maximizer(), eps: float = 1e-8):
 
         super().__init__(name=name, input_dim=input_dim, num_derivatives=num_derivatives,
                          tau=tau, f_exact=f_exact, lower_bound=lower_bound, upper_bound=upper_bound, f_low=f_low,
                          lf_X=lf_X, lf_Y=lf_Y, lf_hf_adapt_ratio=lf_hf_adapt_ratio,
-                         use_composite_kernel=use_composite_kernel, adapt_maximizer=adapt_maximizer)
+                         use_composite_kernel=use_composite_kernel, adapt_maximizer=adapt_maximizer, eps=eps)
 
         # augmentation pattern defined by iterator from augmentationIterators.py
         self.augm_iterator = BackwardAugmentation(self.num_derivatives, dim=input_dim)
@@ -97,7 +97,7 @@ class MultifidelityDataFusion(AbstractMFGP):
         # ARD steps
         self.ARD(self.hf_model, 6)
 
-    def adapt(self, adapt_steps: int, plot_mode: str = None, X_test: np.ndarray = None, Y_test: np.ndarray = None):
+    def adapt(self, adapt_steps: int, plot_mode: str = None, X_test: np.ndarray = None, Y_test: np.ndarray = None, eps: float = 1e-8):
         """optimizes the hf-model by acquiring new hf-training data points, which at each step,
         reduce the uncertainty of the model the most. The new point will be the one, whose corresponding 
         prediction value whould come with the highest uncertainty.
@@ -106,15 +106,19 @@ class MultifidelityDataFusion(AbstractMFGP):
         :type adapt_steps: int
         :param plot_mode: possible modes are 'm', 'u', 'e', and 'mu', defaults to None
         :type plot_mode: string, optional
-        :param X_test: [description], defaults to None
+        :param X_test: test input data, defaults to None
         :type X_test: np.ndarray, optional
-        :param Y_test: [description], defaults to None
+        :param Y_test: test target data, defaults to None
         :type Y_test: np.ndarray, optional
+        :param eps: if (during the adaptation) the max. uncertainty becomes smaller than eps, 
+        stop the adaptation process as the model is sufficiently fitted
+        :type eps: float, optional
         """
 
         self.adapt_steps = adapt_steps
         self.X_test = X_test
         self.Y_test = Y_test
+        self.eps = eps
 
         if self.data_driven_lf_approach:
             self.__adapt_lf()
