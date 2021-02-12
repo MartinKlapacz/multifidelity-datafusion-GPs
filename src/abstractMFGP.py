@@ -11,7 +11,7 @@ class AbstractMFGP(metaclass=abc.ABCMeta):
     @abc.abstractmethod
     def __init__(self, name: str, input_dim: int, num_derivatives: int, tau: float, f_exact: callable,
                  lower_bound: np.ndarray, upper_bound: float, f_low: callable, lf_X: np.ndarray, lf_Y: np.ndarray,
-                 lf_hf_adapt_ratio: int, use_composite_kernel: bool, adapt_maximizer: AbstractMaximizer):
+                 lf_hf_adapt_ratio: int, use_composite_kernel: bool, adapt_maximizer: AbstractMaximizer, eps: float):
 
         super().__init__()
         self.name = name
@@ -22,6 +22,7 @@ class AbstractMFGP(metaclass=abc.ABCMeta):
         self.f_low = f_low
         self.lf_hf_adapt_ratio = lf_hf_adapt_ratio
         self.adapt_maximizer = adapt_maximizer
+        self.eps = eps
 
         # data bounds
         if lower_bound is None and upper_bound is None:
@@ -273,6 +274,7 @@ class AbstractMFGP(metaclass=abc.ABCMeta):
 
     def adapt_and_plot(
             self, plot_means: bool = False, plot_uncertainties: bool = False, plot_error: bool = False, eps: float = 1e-8):
+
         """model adaptation and plotting to illustrate the process of optimization
 
         :param plot_means: plot mean curves, defaults to False
@@ -350,7 +352,7 @@ class AbstractMFGP(metaclass=abc.ABCMeta):
                 mses.append(mse)
 
             self.fit(new_hf_X)
-            if np.abs(fopt) < eps:
+            if np.abs(fopt) < self.eps:
                 self.adapt_steps = i + 1
                 print("Iteration stopped after {} iterations!".format(i + 1)
                       + " minimum uncertainty reached: {:e}".format(fopt))
