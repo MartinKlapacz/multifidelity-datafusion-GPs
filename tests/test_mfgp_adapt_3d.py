@@ -6,9 +6,12 @@ import src.models as models
 import utils as utils
 
 
+a = [3 * np.pi, 2 * np.pi, 1 * np.pi]
+
+
 def hf_3d(param):
     x = np.atleast_2d(param)
-    return np.sin(x[:, 0] * 3 * np.pi) * np.sin(x[:, 1] * 2 * np.pi) * np.sin(x[:, 2] * 1 * np.pi) + 5
+    return np.sin(x[:, 0] * a[0]) * np.sin(x[:, 1] * a[1]) * np.sin(x[:, 2] * a[2]) + 5
 
 
 def lf_3d(param):
@@ -22,7 +25,7 @@ hf_3d_T = lambda x: np.atleast_2d(hf_3d(x)).T
 
 def create_mfgp_obj(dim, lf, hf, X_hf):
     # model = models.GPDF(dim, 0.001, 2, hf, lf)
-    model = models.NARGP(dim, 0.001, hf, lf)
+    model = models.NARGP(dim, hf, lf, add_noise=True)
     model.fit(X_hf)
     return model
 
@@ -30,8 +33,7 @@ if __name__ == '__main__':
     dim = 3
     X_lf, Y_lf, X_hf, Y_hf, X_test = utils.create_data(lf_3d, hf_3d, dim)
     Y_test = hf_3d_T(X_test)
-    mfgp_obj = create_mfgp_obj(dim, lf_3d_T, hf_3d_T, X_hf)
-    a = [3 * np.pi, 2 * np.pi, 1 * np.pi]
+    mfgp_obj = utils.create_mfgp_obj(dim, lf_3d_T, hf_3d_T, X_hf, method='GPDF', add_noise=True)
     actual_mean, actual_variance = utils.analytical_mean(a, constant=5), utils.analytical_var(a)
     distribution = cp.J(cp.Uniform(0, 1), cp.Uniform(0, 1), cp.Uniform(0, 1))
     temp_f = lambda x: mfgp_obj.predict(x)[0]

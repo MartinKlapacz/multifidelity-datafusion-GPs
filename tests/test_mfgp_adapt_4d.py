@@ -7,10 +7,12 @@ import utils as utils
 import time
 
 
+a = [np.pi, np.pi, np.pi, np.pi]
+
+
 def hf_4d(param):
     x = np.atleast_2d(param)
-    return np.sin(x[:, 0] * np.pi) * np.sin(x[:, 1] * np.pi) * np.sin(x[:, 2] * np.pi) \
-           * np.sin(x[:, 3] * np.pi) + 5
+    return np.sin(x[:, 0] * a[0]) * np.sin(x[:, 1] * a[1]) * np.sin(x[:, 2] * a[2]) * np.sin(x[:, 3] * a[3]) + 5
 
 
 def lf_4d(param):
@@ -34,7 +36,6 @@ if __name__ == '__main__':
     X_lf, Y_lf, X_hf, Y_hf, X_test = utils.create_data(lf_4d, hf_4d, dim)
     Y_test = hf_4d_T(X_test)
     mfgp_obj = create_mfgp_obj(dim, lf_4d_T, hf_4d_T, X_hf)
-    a = [np.pi, np.pi, np.pi, np.pi]
     actual_mean, actual_variance = utils.analytical_mean(a, constant=5), utils.analytical_var(a)
     distribution = cp.J(cp.Uniform(0, 1), cp.Uniform(0, 1), cp.Uniform(0, 1), cp.Uniform(0, 1))
     temp_f = lambda x: mfgp_obj.predict(x)[0]

@@ -6,9 +6,12 @@ import src.models as models
 import utils as utils
 
 
+a = [2.2 * np.pi, np.pi]
+
+
 def hf_2d(param):
     x = np.atleast_2d(param)
-    return np.sin(x[:, 0] * 2.2 * np.pi) * np.sin(x[:, 1] * np.pi)
+    return np.sin(x[:, 0] * a[0]) * np.sin(x[:, 1] * a[1])
 
 
 def lf_2d(param):
@@ -30,7 +33,6 @@ if __name__ == '__main__':
     X_lf, Y_lf, X_hf, Y_hf, X_test = utils.create_data(lf_2d, hf_2d, dim)
     Y_test = hf_2d_T(X_test)
     mfgp_obj = create_mfgp_obj(dim, lf_2d_T, hf_2d_T, X_hf)
-    a = [2.2 * np.pi, np.pi]
     actual_mean, actual_variance = utils.analytical_mean(a), utils.analytical_var(a)
     distribution = cp.J(cp.Uniform(0, 1), cp.Uniform(0, 1))
     temp_f = lambda x: mfgp_obj.predict(x)[0]
