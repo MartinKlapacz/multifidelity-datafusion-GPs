@@ -285,7 +285,7 @@ class AbstractMFGP(metaclass=abc.ABCMeta):
         :type plot_error: bool, optional
         """
 
-        X = np.linspace(self.lower_bound, self.upper_bound, 200)
+        X = np.linspace(self.lower_bound, self.upper_bound, 1000)
         mses = []
 
         plot_combined = plot_means and plot_uncertainties
@@ -325,8 +325,8 @@ class AbstractMFGP(metaclass=abc.ABCMeta):
                 mean_ax = axs[0][i]
                 mean_ax.set_title('{} hf-points'.format(len(self.hf_X)))
                 mean_ax.plot(X, means, 'g')
-                mean_ax.plot(X, self.f_low(X), 'r')
-                mean_ax.plot(X, self.f_exact(X), 'b')
+                mean_ax.plot(X, self.f_low(X), 'r:')
+                mean_ax.plot(X, self.f_exact(X), 'b:')
                 mean_ax.plot(self.hf_X, self.hf_Y, 'bx')
                 mean_ax.fill_between(X.flatten(),
                                      y1=means - 2 * uncertainties,
@@ -365,6 +365,7 @@ class AbstractMFGP(metaclass=abc.ABCMeta):
             plt.xlabel('hf points')
             plt.ylabel('mse')
             plt.yscale('log')
+            plt.xticks(np.arange(hf_X_len_before, hf_X_len_now))
             plt.plot(
                 np.arange(hf_X_len_before, hf_X_len_now),
                 np.array(mses),
