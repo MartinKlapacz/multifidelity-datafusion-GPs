@@ -3,6 +3,7 @@ from src.MFDataFusion import MultifidelityDataFusion
 from src.abstractMFGP import AbstractMFGP
 from src.MFDataFusion import MultifidelityDataFusion
 import numpy as np
+import matplotlib.pyplot as plt
 
 
 class GPDFC(MultifidelityDataFusion):
@@ -18,4 +19,8 @@ class GPDFC(MultifidelityDataFusion):
 
         super().__init__(name=name, input_dim=input_dim, num_derivatives=num_derivatives, tau=tau, f_exact=f_exact,
                          lower_bound=lower_bound, upper_bound=upper_bound, f_low=f_low, lf_X=lf_X, lf_Y=lf_Y,
-                         lf_hf_adapt_ratio=lf_hf_adapt_ratio, use_composite_kernel=True, eps=eps)
+
+                         lf_hf_adapt_ratio=lf_hf_adapt_ratio, use_composite_kernel=True, eps=eps, add_noise=add_noise)
+
+        def plot_kernel_params():
+            pass

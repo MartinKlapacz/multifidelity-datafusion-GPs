@@ -38,10 +38,20 @@ def get_curve5(num_hf, num_lf):
     def f_high(t): return np.sin(8 * pi * t + pi/10)
     return get_curve(f_low, f_high, num_hf, num_lf)
 
+def get_curve6(num_hf, num_lf):
+    """simple scaling"""
+    def f_low(t): return np.cos(np.pi * t)
+    def f_high(t): return f_low(t)**8
+    return get_curve(f_low, f_high, num_hf, num_lf)
+
+
 
 def get_discontinuity1(num_hf, num_lf):
     def f_low(t):
-        return .5*(6*t - 2)**2 * np.sin(12*t - 4) + 10*(t - .5)
+        if t < .5:
+            return .5*(6*t - 2)**2 * np.sin(12*t - 4) + 10*(t - .5) - 5
+        else:
+            return .5*(6*t - 2)**2 * np.sin(12*t - 4) + 10*(t - .5)
     def f_high(t):
         return 2 * f_low(t) - 20 * t + 20
     return get_curve(f_low, f_high, num_hf, num_lf)
