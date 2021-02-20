@@ -3,8 +3,7 @@ import numpy as np
 import pickle
 from math import pi
 import matplotlib.pyplot as plt
-
-np.random.seed(42)
+import scipy
 
 def get_curve1(num_lf, num_hf):
     def f_high(X):
@@ -22,6 +21,24 @@ def get_curve2(num_lf, num_hf):
             np.sin(2 * x[0])**2 + np.cos(2 * x[1]) for x in X
         ])[:, None]
 
+    def f_low(X):
+        return 1.5 * f_high(X)*f_high(X) + 3
+    return get_curve(f_low, f_high, num_lf, num_hf)
+
+
+def himmelblau(num_lf, num_hf):
+    def f_high(X):
+        return np.array([
+            (x[0]**2 + x[1] - 11)**2 + (x[0] + x[1]**2 - 7)**2 for x in X
+        ])[:, None]
+
+    def f_low(X):
+        return 1.5 * f_high(X)*f_high(X) + 3
+    return get_curve(f_low, f_high, num_lf, num_hf)
+
+def rosenbrock(num_lf, num_hf):
+    def f_high(X):
+        return scipy.optimize.rosen(X.T)[:, None]
     def f_low(X):
         return 1.5 * f_high(X)*f_high(X) + 3
     return get_curve(f_low, f_high, num_lf, num_hf)

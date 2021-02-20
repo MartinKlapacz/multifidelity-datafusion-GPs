@@ -144,3 +144,4 @@ cython_debug/
 figures
 main*.py
 DIRresults.txt
+.idea
