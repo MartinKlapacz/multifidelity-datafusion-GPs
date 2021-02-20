@@ -2,6 +2,7 @@ astroid==2.4.2
 attrs==20.3.0
 autopep8==1.5.4
 certifi==2020.11.8
+chaospy==4.2.3
 cycler==0.10.0
 decorator==4.4.2
 DIRECT==1.0.1
@@ -15,6 +16,7 @@ llvmlite==0.35.0
 matplotlib==3.3.2
 mccabe==0.6.1
 numba==0.52.0
+numpoly==1.1.1
 numpy==1.19.4
 optimparallel==0.1.1
 packaging==20.8
