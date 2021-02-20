@@ -56,7 +56,7 @@ class MultifidelityDataFusion(AbstractMFGP):
     def __init__(self, name: str, input_dim: int, num_derivatives: int, tau: float, f_exact: callable,
                  lower_bound: np.ndarray = None, upper_bound: float = None, f_low: callable = None, lf_X: np.ndarray = None,
                  lf_Y: np.ndarray = None, lf_hf_adapt_ratio: int = 1, use_composite_kernel: bool = True,
-                 adapt_maximizer: AbstractMaximizer = DIRECT1Maximizer(), eps: float = 1e-8):
+                 adapt_maximizer: AbstractMaximizer = DIRECT1Maximizer(), eps: float = 1e-8, add_noise: bool = False):
 
         super().__init__(name=name, input_dim=input_dim, num_derivatives=num_derivatives,
                          tau=tau, f_exact=f_exact, lower_bound=lower_bound, upper_bound=upper_bound, f_low=f_low,
@@ -69,6 +69,8 @@ class MultifidelityDataFusion(AbstractMFGP):
         self.initialize_kernel(use_composite_kernel)
 
         self.initialize_lf_level(f_low, lf_X, lf_Y)
+
+        self.add_noise = add_noise
 
     def fit(self, hf_X):
         """fits the model by fitting its high-fidelity model with a augmented
@@ -149,6 +151,8 @@ class MultifidelityDataFusion(AbstractMFGP):
         assert X_test.ndim == 2
         assert X_test.shape[1] == self.input_dim
         X_test = self.__augment_Data(X_test)
+        if self.add_noise:
+            self.hf_model.likelihood.variance = 1e-6
         return self.hf_model.predict(X_test)
 
     def get_mse(self, X_test, Y_test):
