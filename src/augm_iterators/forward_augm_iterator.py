@@ -2,10 +2,10 @@ import numpy as np
 from .abstract_augm_iterator import AbstractAugmIterator
 
 
-class BackwardAugmentation(AbstractAugmIterator):
-    """ generates a number sequence 0, -1, -2, ..., -n.
+class ForwardAugmentation(AbstractAugmIterator):
+    """ generates a number sequence 0, 1, 2, ..., -n.
     Can be used to build a manifold function g with input pattern 
-    g(t, f_l(t), f_l(t - tau), ..., f_l(t - n*tau)) if dim = 1.
+    g(t, f_l(t), ..., f_l(t + n*tau)) if dim = 1.
 
     :param n: number of derivatives to include
     :type n: integer
@@ -23,7 +23,7 @@ class BackwardAugmentation(AbstractAugmIterator):
             self.i = 1
             return vector
         if self.i <= self.n:
-            vector[self.dim_i] = -self.i
+            vector[self.dim_i] = self.i
             if self.dim_i == self.dim - 1:
                 self.i += 1
                 self.dim_i = 0
@@ -39,3 +39,4 @@ class BackwardAugmentation(AbstractAugmIterator):
     def reset(self):
         self.i = 0
         self.dim_i = 0
+

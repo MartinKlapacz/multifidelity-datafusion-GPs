@@ -1,3 +1,5 @@
-from src.augm_iterators.abstract_augm_iterator import *
-from src.augm_iterators.backward_augm_iterator import *
-from src.augm_iterators.even_augm_iterator import *
+from src.augm_iterators.abstract_augm_iterator import AbstractAugmIterator
+
+from src.augm_iterators.backward_augm_iterator import BackwardAugmentation
+from src.augm_iterators.forward_augm_iterator import ForwardAugmentation
+from src.augm_iterators.even_augm_iterator import EvenAugmentation
