@@ -1,2 +1,2 @@
 from src.adaptation_maximizers.abstract_maximizer import AbstractMaximizer
-from src.adaptation_maximizers.DIRECT1_maximizer import DIRECT1Maximizer
+from src.adaptation_maximizers.DIRECTL_maximizer import DIRECTLMaximizer

@@ -26,3 +26,4 @@ class AbstractMaximizer(metaclass=ABCMeta):
         :return: returns an array that maximizes the model_predict function
         :rtype: np.ndarray
         """
+        pass

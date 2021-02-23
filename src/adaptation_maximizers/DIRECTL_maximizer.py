@@ -3,7 +3,7 @@ from .abstract_maximizer import AbstractMaximizer
 from DIRECT import solve
 
 
-class DIRECT1Maximizer(AbstractMaximizer):
+class DIRECTLMaximizer(AbstractMaximizer):
     """Wrapper class for the uncertainty maximization in the adaptation 
     process, uses the deterministic DIRECT-1 global optimization algorithm
     to solve the optimization problem

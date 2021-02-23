@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 from DIRECT import solve
 
 from .abstractMFGP import AbstractMFGP
-from .adaptation_maximizers import DIRECT1Maximizer, AbstractMaximizer
+from .adaptation_maximizers import DIRECTLMaximizer, AbstractMaximizer
 from .augm_iterators import *
 from sklearn.metrics import mean_squared_error
 from scipy.optimize import fmin
@@ -56,16 +56,14 @@ class MultifidelityDataFusion(AbstractMFGP):
     def __init__(self, name: str, input_dim: int, num_derivatives: int, tau: float, f_exact: callable,
                  lower_bound: np.ndarray = None, upper_bound: float = None, f_low: callable = None, lf_X: np.ndarray = None,
                  lf_Y: np.ndarray = None, lf_hf_adapt_ratio: int = 1, use_composite_kernel: bool = True,
-                 adapt_maximizer: AbstractMaximizer = DIRECT1Maximizer(),
+                 adapt_maximizer: AbstractMaximizer = DIRECTLMaximizer(),
                  eps: float = 1e-8, iteratorClass: AbstractAugmIterator = EvenAugmentation, add_noise: bool = False):
 
         super().__init__(name=name, input_dim=input_dim, num_derivatives=num_derivatives,
                          tau=tau, f_exact=f_exact, lower_bound=lower_bound, upper_bound=upper_bound, f_low=f_low,
                          lf_X=lf_X, lf_Y=lf_Y, lf_hf_adapt_ratio=lf_hf_adapt_ratio,
-                         use_composite_kernel=use_composite_kernel, adapt_maximizer=adapt_maximizer, eps=eps)
-
-        # augmentation pattern defined by iterator from augmentationIterators.py
-        self.augm_iterator = iteratorClass(self.num_derivatives, dim=input_dim)
+                         use_composite_kernel=use_composite_kernel, adapt_maximizer=adapt_maximizer, eps=eps,
+                         iteratorClass=iteratorClass)
 
         self.initialize_kernel(use_composite_kernel)
 

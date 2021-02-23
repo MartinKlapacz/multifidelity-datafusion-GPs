@@ -39,4 +39,3 @@ class ForwardAugmentation(AbstractAugmIterator):
     def reset(self):
         self.i = 0
         self.dim_i = 0
-
