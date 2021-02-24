@@ -5,3 +5,4 @@ from src.models import *
 
 import src.data.exampleCurves1D as example1D
 import src.data.exampleCurves2D as example2D
+import src.data.rosenbrock as rb
