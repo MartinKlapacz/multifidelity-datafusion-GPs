@@ -124,7 +124,7 @@ class AbstractMFGP(metaclass=abc.ABCMeta):
             self.lf_model = GPy.models.GPRegression(
                 self.lf_X, self.lf_Y, initialize=True
             )
-            self.__ARD(self.lf_model, 6)
+            self.__ARD(self.lf_model, 12)
 
     def get_input_with_highest_uncertainty(self, model):
         """get input from input domain whose prediction comes with the highest uncertainty"""
@@ -217,15 +217,24 @@ class AbstractMFGP(metaclass=abc.ABCMeta):
                 self.lower_bound, self.upper_bound, 50).reshape(-1, 1)
             self.lf_Y = self.f_low(self.lf_X)
 
-        lf_color, hf_color, pred_color = 'r', 'b', 'g'
+        lf_color, hf_color, pred_color = 'r', 'b', 'lightgreen'
 
         plt.figure()
         if plot_lf:
             # plot low fidelity
-            plt.plot(self.lf_X, self.lf_Y, lf_color +
-                     'x', label='low-fidelity')
+            # plt.plot(self.lf_X, self.lf_Y, lf_color +
+            #          'x', label='low-fidelity')
             plt.plot(X, self.f_low(X), lf_color,
                      label='f_low', linestyle='dashed')
+
+        if plot_pred:
+            # plot prediction
+            plt.plot(X, mean, pred_color, label='prediction', linewidth=4.0)
+            plt.fill_between(X.flatten(),
+                             y1=mean - 2 * uncertainty,
+                             y2=mean + 2 * uncertainty,
+                             color=(0, 1, 0, .75)
+                             )
 
         if plot_hf:
             # plot high fidelity
@@ -233,15 +242,6 @@ class AbstractMFGP(metaclass=abc.ABCMeta):
                      'x', label='high-fidelity')
             plt.plot(X, self.f_exact(X), hf_color,
                      label='f_high', linestyle='dashed')
-
-        if plot_pred:
-            # plot prediction
-            plt.plot(X, mean, pred_color, label='prediction')
-            plt.fill_between(X.flatten(),
-                             y1=mean - 2 * uncertainty,
-                             y2=mean + 2 * uncertainty,
-                             color=(0, 1, 0, .75)
-                             )
 
         plt.legend()
         if self.name:
@@ -271,11 +271,11 @@ class AbstractMFGP(metaclass=abc.ABCMeta):
 
         ax = plt.gca(projection='3d')
         if plot_pred:
-            ax.scatter(X1, X2, preds)
+            ax.scatter(X1, X2, preds, c='green')
         if plot_lf:
             ax.scatter(X1, X2, lf_y)
         if plot_hf:
-            ax.scatter(X1, X2, hf_y)
+            ax.scatter(X1, X2, hf_y, 'blue')
 
     def adapt_and_plot(
             self, plot_means: bool = False, plot_uncertainties: bool = False, plot_error: bool = False, eps: float = 1e-8):

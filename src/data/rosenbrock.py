@@ -17,32 +17,24 @@ def rosenbrock(num_lf, num_hf, dim):
         return np.array([scipy.optimize.rosen(x) for x in X])[:,None]
 
     def f_low(X):
-        return 1.5 * f_high(X) + 3 #
-        + X[:,1] * .01
+        return f_high(X) + np.exp(np.sum(X)) * 0.1
+
     return get_curve(f_low, f_high, num_lf, num_hf, dim)
 
 
 def get_curve(f_low, f_high, num_lf, num_hf, dim):
 
-    hf_size = num_hf
-    lf_size = num_lf
-    N = lf_size + hf_size
+    N = num_lf + num_hf
 
-    train_proportion = 0.8
+    X_train = np.random.uniform(np.zeros(dim), np.ones(dim), size=(N, dim))
+    X_test = np.random.uniform(np.zeros(dim), np.ones(dim), size=(N, dim))
 
-    X = np.random.uniform(-5*np.ones(dim),5*np.ones(dim), size=(N, dim))
+    X_train_hf = X_train[:num_hf]
+    X_train_lf = X_train[num_hf:]
 
-    np.random.shuffle(X)
+    Y_train_hf = f_high(X_train_hf)
+    Y_train_lf = f_low(X_train_lf)
 
-    X_train = X[:int(N * train_proportion)]
-    X_test = X[int(N * train_proportion):]
+    Y_test = f_high(X_test)
 
-    X_train_hf = X_train[:hf_size]
-    X_train_lf = X_train[hf_size:]
-
-    y_train_hf = f_high(X_train_hf)
-    y_train_lf = f_low(X_train_lf)
-
-    y_test = f_high(X_test)
-
-    return X_train_hf, X_train_lf, y_train_lf, f_high, f_low, X_test, y_test
+    return X_train_hf, X_train_lf, Y_train_lf, f_high, f_low, X_test, Y_test

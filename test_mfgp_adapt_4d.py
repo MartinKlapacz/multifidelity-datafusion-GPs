@@ -27,7 +27,7 @@ hf_4d_T = lambda x: np.atleast_2d(hf_4d(x)).T
 
 def create_mfgp_obj(dim, lf, hf, X_hf):
     # model = models.GPDF(dim, 0.001, 2, hf, lf)
-    model = models.NARGP(dim, hf, lf)
+    model = models.NARGP(dim, f_exact=hf, f_low=lf)
     model.fit(X_hf)
     return model
 
@@ -67,6 +67,23 @@ if __name__ == '__main__':
                                                   np.abs((variance - actual_variance) / actual_variance)
     print("Error in mean", relative_error_mean)
     print("Error in variance", relative_error_variance)
+
+    import matplotlib.pyplot as plt
+
+
+    plt.plot(mfgpc.cost_history, np.abs(np.array(mfgpc.mean_history) - actual_mean)/actual_mean, 'v-')
+    plt.yscale('log')
+    plt.ylabel('relative error', fontsize=16)
+    plt.xlabel('hf points', fontsize=16)
+    plt.title('mean estimation history', fontsize=20)
+    plt.show()
+    plt.plot(mfgpc.cost_history, np.abs(np.array(mfgpc.var_history) - actual_variance)/actual_variance, 'v-')
+    plt.yscale('log')
+    plt.ylabel('relative error', fontsize=16)
+    plt.xlabel('hf points', fontsize=16)
+    plt.title('variance estimation history', fontsize=20)
+    plt.show()
+
 
 
 '''
