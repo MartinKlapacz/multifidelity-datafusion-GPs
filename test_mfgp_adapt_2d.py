@@ -6,9 +6,6 @@ import src.models as models
 import utils as utils
 import matplotlib.pyplot as plt
 
-import array_to_latex as a2l
-
-
 a = [2.2 * np.pi, np.pi]
 
 
