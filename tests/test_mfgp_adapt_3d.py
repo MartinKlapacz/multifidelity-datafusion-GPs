@@ -6,7 +6,7 @@ import src.models as models
 import utils as utils
 
 
-a = [3 * np.pi, 2 * np.pi, 1 * np.pi]
+a = [3.2 * np.pi, 2.1 * np.pi, 1.2 * np.pi]
 
 
 def hf_3d(param):

@@ -106,14 +106,14 @@ def get_gpc_error(dim, start_order=2, end_order=10):
 
 
 if __name__ == '__main__':
-    dim, add_noise = 2, True
+    dim, add_noise = 4, True
     a, lf, hf = get_a_lf_hf_function(dim)
     X_lf, Y_lf, X_hf, Y_hf, X_test = create_data(lf, hf, dim)
     actual_mean, actual_variance = analytical_mean(a, constant=5), analytical_var(a)
     print(actual_mean, actual_variance)
     order = get_order(dim)
     # change end order to change the computational cost
-    gpc_mean, gpc_variance, gpc_cost = get_gpc_error(dim, start_order=2, end_order=6)
+    gpc_mean, gpc_variance, gpc_cost = get_gpc_error(dim, start_order=1, end_order=2)
     nargp_mean, nargp_var, nargp_cost, nargp_mse = get_mean_var_mse_mfgpc(dim, lf, hf, X_hf, X_test, 'NARGP', order)
     gpdf_mean, gpdf_var, gpdf_cost, gpdf_mse = get_mean_var_mse_mfgpc(dim, lf, hf, X_hf, X_test, 'GPDF', order)
     gpdfc_mean, gpdfc_var, gpdfc_cost, gpdfc_mse = get_mean_var_mse_mfgpc(dim, lf, hf, X_hf, X_test, 'GPDFC', order)
@@ -121,8 +121,8 @@ if __name__ == '__main__':
     plt.plot(nargp_cost, np.abs((nargp_var - actual_variance)/actual_variance), label='NARGP')
     plt.plot(gpdf_cost, np.abs((gpdf_var - actual_variance)/actual_variance), label='GPDF')
     plt.plot(nargp_cost, np.abs((gpdfc_var - actual_variance)/actual_variance), label='GPDFC')
-    plt.xlabel('Relative error variance')
-    plt.ylabel('Computational Cost')
+    plt.ylabel('Relative error variance')
+    plt.xlabel('Computational Cost')
     plt.yscale('log')
     plt.legend()
     plt.show()
@@ -130,8 +130,8 @@ if __name__ == '__main__':
     plt.plot(nargp_cost, np.abs((nargp_mean - actual_mean)/actual_mean), label='NARGP')
     plt.plot(gpdf_cost, np.abs((gpdf_mean - actual_mean)/actual_mean), label='GPDF')
     plt.plot(nargp_cost, np.abs((gpdfc_mean - actual_mean)/actual_mean), label='GPDFC')
-    plt.xlabel('Relative error mean')
-    plt.ylabel('Computational Cost')
+    plt.ylabel('Relative error mean')
+    plt.xlabel('Computational Cost')
     plt.yscale('log')
     plt.legend()
     plt.show()
@@ -139,4 +139,4 @@ if __name__ == '__main__':
     print("NARGP", nargp_mean, nargp_var, nargp_cost)
     print("GPDF", gpdf_mean, gpdf_var, gpdf_cost)
     print("GPDFC", gpdfc_mean, gpdfc_var, gpdfc_cost)
-    print("Analytical", analytical_mean, analytical_var)
+    print("Analytical", actual_mean, actual_variance)
