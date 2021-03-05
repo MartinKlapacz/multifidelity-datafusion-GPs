@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 from DIRECT import solve
 
 from .abstractMFGP import AbstractMFGP
-from .adaptation_maximizers import DIRECTLMaximizer, AbstractMaximizer
+from .adaptation_maximizers import DIRECTLMaximizer, AbstractMaximizer, ScipyDirectMaximizer
 from .augm_iterators import *
 from sklearn.metrics import mean_squared_error
 from scipy.optimize import fmin
@@ -56,7 +56,7 @@ class MultifidelityDataFusion(AbstractMFGP):
     def __init__(self, name: str, input_dim: int, num_derivatives: int, tau: float, f_exact: callable,
                  lower_bound: np.ndarray = None, upper_bound: float = None, f_low: callable = None, lf_X: np.ndarray = None,
                  lf_Y: np.ndarray = None, lf_hf_adapt_ratio: int = 1, use_composite_kernel: bool = True,
-                 adapt_maximizer: AbstractMaximizer = DIRECTLMaximizer(),
+                 adapt_maximizer: AbstractMaximizer = ScipyDirectMaximizer(),
                  eps: float = 1e-8, iteratorClass: AbstractAugmIterator = EvenAugmentation, add_noise: bool = False):
 
         super().__init__(name=name, input_dim=input_dim, num_derivatives=num_derivatives,

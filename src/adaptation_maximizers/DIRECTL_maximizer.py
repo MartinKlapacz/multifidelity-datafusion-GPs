@@ -20,8 +20,12 @@ class DIRECTLMaximizer(AbstractMaximizer):
         def acquisition_curve(x: float, dummy):
             # DIRECT.solve() calls this function with x and a dummy value
             _, uncertainty = model_predict(x[None])
-            return - uncertainty[:, None]
+            return - uncertainty[:, None] 
 
         xopt, fopt, _ = solve(acquisition_curve, lower_bound, upper_bound,
                               maxT=self.maxT, algmethod=self.algmethod)
+        print("Selected point", xopt, fopt)
+        x = np.atleast_2d(np.linspace(lower_bound, upper_bound, 100))
+        _, u = model_predict(x)
+        print("Other vals = ", np.max(u))
         return xopt, fopt

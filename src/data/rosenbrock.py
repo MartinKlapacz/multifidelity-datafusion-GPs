@@ -17,7 +17,7 @@ def rosenbrock(num_lf, num_hf, dim):
         return np.array([scipy.optimize.rosen(x) for x in X])[:,None]
 
     def f_low(X):
-        return f_high(X) + np.exp(np.sum(X)) * 0.1
+        return f_high(X - 0.1) + np.sin(2* np.pi* np.sum(X))
 
     return get_curve(f_low, f_high, num_lf, num_hf, dim)
 
@@ -25,6 +25,7 @@ def rosenbrock(num_lf, num_hf, dim):
 def get_curve(f_low, f_high, num_lf, num_hf, dim):
 
     N = num_lf + num_hf
+    N = 500
 
     X_train = np.random.uniform(np.zeros(dim), np.ones(dim), size=(N, dim))
     X_test = np.random.uniform(np.zeros(dim), np.ones(dim), size=(N, dim))

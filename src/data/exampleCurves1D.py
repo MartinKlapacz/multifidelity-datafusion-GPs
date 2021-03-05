@@ -114,7 +114,7 @@ def get_curve(f_low, f_high, num_hf, num_lf):
     f_low = np.vectorize(f_low)
     f_high = np.vectorize(f_high)
 
-    N = num_lf + num_hf
+    N = 500
 
     train_proportion = 0.8
 

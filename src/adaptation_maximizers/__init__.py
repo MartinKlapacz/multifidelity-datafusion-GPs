@@ -1,2 +1,3 @@
 from src.adaptation_maximizers.abstract_maximizer import AbstractMaximizer
 from src.adaptation_maximizers.DIRECTL_maximizer import DIRECTLMaximizer
+from src.adaptation_maximizers.scipydirect_wrapper import ScipyDirectMaximizer

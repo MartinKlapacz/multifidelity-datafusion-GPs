@@ -11,7 +11,7 @@ dim = 2
 tau = .01
 
 
-_, _, _, f_exact, f_low, X_test, Y_test = rosenbrock(20, 80, dim)
+X_train_hf, X_train_lf, Y_train_hf, f_exact, f_low, X_test, Y_test = rosenbrock(10, 80, dim)
 
 nargp = NARGP(
     name='NARGP',
@@ -56,27 +56,37 @@ gpdfc4 = GPDFC(
     f_low=f_low,
 )
 
-models = [gpdf2, gpdfc2, gpdf4, gpdfc4]
-
-labels = ['gpdf2', 'gpdfc2', 'gpdf4', 'gpdfc4']
-sizes = [5, 10, 15, 20, 25]
+# models = [gpdf2, gpdfc2, gpdf4, gpdfc4]
+# labels = ['gpdf2', 'gpdfc2', 'gpdf4', 'gpdfc4']
+models = [nargp]
+labels = ['NARGP']
+sizes = [10, 15, 20, 25, 30]
+sizes = [10, 15, 20]
+num_adapt = 2
 nruns = 1
 
 mses = np.zeros((len(models), len(sizes)))
 
-for i, model in enumerate(models):
-    for j, size in enumerate(sizes):
-        mse_runs = []
-        # make average runs
-        for _ in range(nruns):
-            X_train_hf, _, _, _, _, _, _ = rosenbrock(size, 80, dim)
-            model.fit(X_train_hf)
-            new_mse = model.get_mse(X_test, Y_test)
-            mse_runs.append(new_mse)
+# for i, model in enumerate(models):
+    # for j, size in enumerate(sizes):
+        # mse_runs = []
+        # # make average runs
+        # for _ in range(nruns):
+            # X_train_hf, _, _, _, _, _, _ = rosenbrock(size, 80, dim)
+            # model.fit(X_train_hf)
+            # new_mse = model.get_mse(X_test, Y_test)
+            # mse_runs.append(new_mse)
         
-        mses[i, j] = np.array(mse_runs).mean()
-        print(size, model, mse_runs)
+        # mses[i, j] = np.array(mse_runs).mean()
+        # print(size, model, mse_runs)
 
+for i, model in enumerate(models):
+    model.fit(X_train_hf)
+    mses[i, 0] = model.get_mse(X_test, Y_test)
+    for j in range(num_adapt):
+        model.adapt(5)
+        mses[i, j+1] = model.get_mse(X_test, Y_test)
+print(mses)
 
 for i in range(len(mses)):
     plt.plot(sizes, mses[i,:], '>-', label=labels[i])
@@ -88,4 +98,3 @@ plt.ylabel('mse', fontsize=16)
 plt.title('Rosenbrock function {}D'.format(dim), fontsize=20)
 plt.legend()
 plt.show()
-print(mses)
