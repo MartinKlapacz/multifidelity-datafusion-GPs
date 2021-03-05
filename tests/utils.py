@@ -8,6 +8,7 @@ import chaospy as cp
 import src.gpc.mfgp_gpc as mfgp_gpc
 import src.models as models
 import matplotlib.pyplot as plt
+np.random.seed(10)
 
 
 def analytical_mean(a, constant=0):
@@ -112,7 +113,7 @@ if __name__ == '__main__':
     print(actual_mean, actual_variance)
     order = get_order(dim)
     # change end order to change the computational cost
-    gpc_mean, gpc_variance, gpc_cost = get_gpc_error(dim, start_order=2, end_order=order)
+    gpc_mean, gpc_variance, gpc_cost = get_gpc_error(dim, start_order=2, end_order=6)
     nargp_mean, nargp_var, nargp_cost, nargp_mse = get_mean_var_mse_mfgpc(dim, lf, hf, X_hf, X_test, 'NARGP', order)
     gpdf_mean, gpdf_var, gpdf_cost, gpdf_mse = get_mean_var_mse_mfgpc(dim, lf, hf, X_hf, X_test, 'GPDF', order)
     gpdfc_mean, gpdfc_var, gpdfc_cost, gpdfc_mse = get_mean_var_mse_mfgpc(dim, lf, hf, X_hf, X_test, 'GPDFC', order)
@@ -125,3 +126,17 @@ if __name__ == '__main__':
     plt.yscale('log')
     plt.legend()
     plt.show()
+    plt.plot(gpc_cost, np.abs((gpc_mean - actual_mean)/actual_mean), label='Direct GPC')
+    plt.plot(nargp_cost, np.abs((nargp_mean - actual_mean)/actual_mean), label='NARGP')
+    plt.plot(gpdf_cost, np.abs((gpdf_mean - actual_mean)/actual_mean), label='GPDF')
+    plt.plot(nargp_cost, np.abs((gpdfc_mean - actual_mean)/actual_mean), label='GPDFC')
+    plt.xlabel('Relative error mean')
+    plt.ylabel('Computational Cost')
+    plt.yscale('log')
+    plt.legend()
+    plt.show()
+    print("Direct GPC", gpc_mean, gpc_variance, gpc_cost)
+    print("NARGP", nargp_mean, nargp_var, nargp_cost)
+    print("GPDF", gpdf_mean, gpdf_var, gpdf_cost)
+    print("GPDFC", gpdfc_mean, gpdfc_var, gpdfc_cost)
+    print("Analytical", analytical_mean, analytical_var)
