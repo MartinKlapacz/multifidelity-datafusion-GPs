@@ -1,5 +1,5 @@
 #!./env/bin/python
-from src.data.rosenbrock import rosenbrock
+from src.data.rosenbrock import rosenbrock, product_sin2, product_sin4, product_sin8
 import matplotlib.pyplot as plt
 import numpy as np
 
@@ -7,11 +7,14 @@ from src import MultifidelityDataFusion
 from src import MethodAssessment
 from src import NARGP, GPDF, GPDFC
 
+np.random.seed(10)
+
 dim = 2
 tau = .01
 
 
-X_train_hf, X_train_lf, Y_train_hf, f_exact, f_low, X_test, Y_test = rosenbrock(10, 80, dim)
+# X_train_hf, X_train_lf, Y_train_hf, f_exact, f_low, X_test, Y_test = rosenbrock(80, 15, dim)
+X_train_hf, X_train_lf, Y_train_hf, f_exact, f_low, X_test, Y_test = product_sin2(80, 5)
 
 nargp = NARGP(
     name='NARGP',
@@ -56,16 +59,19 @@ gpdfc4 = GPDFC(
     f_low=f_low,
 )
 
-# models = [gpdf2, gpdfc2, gpdf4, gpdfc4]
-# labels = ['gpdf2', 'gpdfc2', 'gpdf4', 'gpdfc4']
-models = [nargp]
-labels = ['NARGP']
-sizes = [10, 15, 20, 25, 30]
-sizes = [10, 15, 20]
-num_adapt = 2
+models = [gpdf2, gpdfc2, gpdf4, gpdfc4, nargp]
+labels = ['GPDF2', 'GPDFC2', 'GPDF4', 'GPDFC4', 'NARGP']
+# models = [nargp]
+# labels = ['NARGP']
+sizes = [5, 10, 15, 20, 25]
+num_adapt = 4
 nruns = 1
 
+# Y_other = f_low(X_test)
+# print(np.linalg.norm((Y_other - Y_test)/Y_test)/len(Y_test))
+
 mses = np.zeros((len(models), len(sizes)))
+print(X_train_hf.shape)
 
 # for i, model in enumerate(models):
     # for j, size in enumerate(sizes):
@@ -86,7 +92,7 @@ for i, model in enumerate(models):
     for j in range(num_adapt):
         model.adapt(5)
         mses[i, j+1] = model.get_mse(X_test, Y_test)
-print(mses)
+    print(labels[i], mses[i, :])
 
 for i in range(len(mses)):
     plt.plot(sizes, mses[i,:], '>-', label=labels[i])
@@ -95,6 +101,6 @@ for i in range(len(mses)):
 plt.yscale('log')
 plt.xlabel('hf-points', fontsize=16)
 plt.ylabel('mse', fontsize=16)
-plt.title('Rosenbrock function {}D'.format(dim), fontsize=20)
+# plt.title('Rosenbrock function {}D'.format(dim), fontsize=20)
 plt.legend()
 plt.show()
