@@ -79,7 +79,7 @@ def get_mean_var_mse_mfgpc(dim, lf, hf, X_hf, X_test, method, order, add_noise=T
     temp_f = lambda x: mfgp_obj.predict(x)[0]
     distribution = get_joint_uniform_distribution(dim)
     cp_wrapper = cpw.ChaospyWrapper(temp_f, distribution, polynomial_order=order, quadrature_order=order)
-    mfgpc = mfgp_gpc.MFGP_GPC(mfgp_obj, cp_wrapper, 5, 5, X_test=X_test, Y_test=Y_test)
+    mfgpc = mfgp_gpc.MFGP_GPC(mfgp_obj, cp_wrapper, 13, 5, X_test=X_test, Y_test=Y_test)
     mfgpc.adapt()
     return mfgpc.mean_history, mfgpc.var_history, mfgpc.cost_history, mfgpc.mse_history
 
@@ -105,23 +105,35 @@ def get_gpc_error(dim, start_order=2, end_order=10):
 
 
 if __name__ == '__main__':
-    dim, add_noise = 2, True
+    dim, add_noise = 3, True
     a, lf, hf = get_a_lf_hf_function(dim)
     X_lf, Y_lf, X_hf, Y_hf, X_test = create_data(lf, hf, dim)
     actual_mean, actual_variance = analytical_mean(a, constant=5), analytical_var(a)
     print(actual_mean, actual_variance)
     order = get_order(dim)
     # change end order to change the computational cost
-    gpc_mean, gpc_variance, gpc_cost = get_gpc_error(dim, start_order=2, end_order=order)
-    nargp_mean, nargp_var, nargp_cost, nargp_mse = get_mean_var_mse_mfgpc(dim, lf, hf, X_hf, X_test, 'NARGP', order)
-    gpdf_mean, gpdf_var, gpdf_cost, gpdf_mse = get_mean_var_mse_mfgpc(dim, lf, hf, X_hf, X_test, 'GPDF', order)
-    gpdfc_mean, gpdfc_var, gpdfc_cost, gpdfc_mse = get_mean_var_mse_mfgpc(dim, lf, hf, X_hf, X_test, 'GPDFC', order)
-    plt.plot(gpc_cost, np.abs((gpc_variance - actual_variance)/actual_variance), label='Direct GPC')
-    plt.plot(nargp_cost, np.abs((nargp_var - actual_variance)/actual_variance), label='NARGP')
-    plt.plot(gpdf_cost, np.abs((gpdf_var - actual_variance)/actual_variance), label='GPDF')
-    plt.plot(nargp_cost, np.abs((gpdfc_var - actual_variance)/actual_variance), label='GPDFC')
-    plt.xlabel('Relative error variance')
-    plt.ylabel('Computational Cost')
+    var = False
+    if var:
+        gpc_mean, gpc_variance, gpc_cost = get_gpc_error(dim, start_order=1, end_order=7)
+        nargp_mean, nargp_var, nargp_cost, nargp_mse = get_mean_var_mse_mfgpc(dim, lf, hf, X_hf, X_test, 'NARGP', order)
+        gpdf_mean, gpdf_var, gpdf_cost, gpdf_mse = get_mean_var_mse_mfgpc(dim, lf, hf, X_hf, X_test, 'GPDF', order)
+        gpdfc_mean, gpdfc_var, gpdfc_cost, gpdfc_mse = get_mean_var_mse_mfgpc(dim, lf, hf, X_hf, X_test, 'GPDFC', order)
+        plt.plot(gpc_cost, np.abs((gpc_variance - actual_variance)/actual_variance), label='Direct GPC')
+        plt.plot(nargp_cost, np.abs((nargp_var - actual_variance)/actual_variance), label='NARGP')
+        plt.plot(gpdf_cost, np.abs((gpdf_var - actual_variance)/actual_variance), label='GPDF')
+        plt.plot(nargp_cost, np.abs((gpdfc_var - actual_variance)/actual_variance), label='GPDFC')
+        plt.ylabel('Relative error variance', fontsize=16)
+    else:
+        gpc_mean, gpc_variance, gpc_cost = get_gpc_error(dim, start_order=1, end_order=3)
+        nargp_mean, nargp_var, nargp_cost, nargp_mse = get_mean_var_mse_mfgpc(dim, lf, hf, X_hf, X_test, 'NARGP', order)
+        gpdf_mean, gpdf_var, gpdf_cost, gpdf_mse = get_mean_var_mse_mfgpc(dim, lf, hf, X_hf, X_test, 'GPDF', order)
+        gpdfc_mean, gpdfc_var, gpdfc_cost, gpdfc_mse = get_mean_var_mse_mfgpc(dim, lf, hf, X_hf, X_test, 'GPDFC', order)
+        plt.plot(gpc_cost, np.abs((gpc_mean - actual_mean)/actual_mean), label='Direct GPC')
+        plt.plot(nargp_cost, np.abs((nargp_mean - actual_mean)/actual_mean), label='NARGP')
+        plt.plot(gpdf_cost, np.abs((gpdf_mean - actual_mean)/actual_mean), label='GPDF')
+        plt.plot(nargp_cost, np.abs((gpdfc_mean - actual_mean)/actual_mean), label='GPDFC')
+        plt.ylabel('Relative error mean', fontsize=16)
+    plt.xlabel('Computational Cost', fontsize=16)
     plt.yscale('log')
     plt.legend()
-    plt.show()
+    plt.show() 
