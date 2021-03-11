@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 from DIRECT import solve
 
 from .abstractMFGP import AbstractMFGP
-from .adaptation_maximizers import DIRECT1Maximizer, AbstractMaximizer, ScipyDirectMaximizer
+from .adaptation_maximizers import DIRECT1Maximizer, AbstractMaximizer, ScipyDirectMaximizer, TGOMaximizer
 from .augm_iterators import EvenAugmentation, BackwardAugmentation
 from sklearn.metrics import mean_squared_error
 from scipy.optimize import fmin
