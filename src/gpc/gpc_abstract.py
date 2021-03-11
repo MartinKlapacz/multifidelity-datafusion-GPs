@@ -22,6 +22,10 @@ class AbstractGPC(metaclass=abc.ABCMeta):
     def get_var(self):
         pass
 
+    @abc.abstractmethod
+    def get_sobol(self):
+        pass 
+
     def get_mean_var(self):
         return self.get_mean(), self.get_var()
 

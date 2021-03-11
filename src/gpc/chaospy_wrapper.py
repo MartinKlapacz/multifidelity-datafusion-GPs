@@ -32,3 +32,6 @@ class ChaospyWrapper(AbstractGPC):
         self.polynomial_order, self.quadrature_order = new_order, new_order
         self.quad_points, self.quad_weights = cp.generate_quadrature(self.quadrature_order, self.distribution, rule="gaussian")
         self.polynomial_expansion = cp.generate_expansion(self.polynomial_order, self.distribution)
+
+    def get_sobol(self):
+        return cp.Sens_t(self.f_approx, self.distribution)

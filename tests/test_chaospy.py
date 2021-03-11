@@ -45,3 +45,4 @@ def function_2d(param):
 if __name__ == '__main__':
     a = [2.2 * np.pi, np.pi]
     cp_wrapper = test_2d(a)
+    print(cp_wrapper.get_sobol())
